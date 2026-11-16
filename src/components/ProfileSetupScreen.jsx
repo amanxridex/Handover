@@ -1,18 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import avatarDefault from '../assets/avatar-default.jpg';
 import handoverWordmark from '../assets/logos/handover-wordmark.png';
+import { checkUsernameAvailable } from '../services/profileService';
 import { triggerLightHaptic } from '../utils/nativeBridge';
 import { BackTriangleIcon } from './Icons';
-
-const RESERVED_USERNAMES = new Set([
-  'admin',
-  'handover',
-  'support',
-  'oliviia_be',
-  'root',
-  'test',
-  'taken',
-]);
 
 export default function ProfileSetupScreen({ initialData, onBack, onComplete }) {
   const fileInputRef = useRef(null);
@@ -33,16 +24,20 @@ export default function ProfileSetupScreen({ initialData, onBack, onComplete }) 
       return undefined;
     }
 
+    let cancelled = false;
     setCheckStatus('checking');
-    const timer = setTimeout(() => {
-      if (RESERVED_USERNAMES.has(clean)) {
-        setCheckStatus('taken');
-      } else {
-        setCheckStatus('available');
-      }
-    }, 850);
 
-    return () => clearTimeout(timer);
+    const minDelay = new Promise((resolve) => setTimeout(resolve, 700));
+    Promise.all([checkUsernameAvailable(clean), minDelay]).then(
+      ([available]) => {
+        if (cancelled) return;
+        setCheckStatus(available ? 'available' : 'taken');
+      }
+    );
+
+    return () => {
+      cancelled = true;
+    };
   }, [username]);
 
   const handleFileChange = (e) => {

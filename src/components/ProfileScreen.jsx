@@ -62,6 +62,7 @@ export default function ProfileScreen({
   selectedPost,
   onSelectPost,
   onClosePost,
+  onResetOnboarding,
 }) {
   const [isFollowing, setIsFollowing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -137,6 +138,20 @@ export default function ProfileScreen({
               >
                 Copy handle (@oliviia_be)
               </button>
+              {onResetOnboarding && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="profile-more-item"
+                  onClick={() => {
+                    triggerLightHaptic();
+                    setMenuOpen(false);
+                    onResetOnboarding();
+                  }}
+                >
+                  Restart onboarding
+                </button>
+              )}
             </div>
           )}
         </div>

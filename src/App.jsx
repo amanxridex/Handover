@@ -31,6 +31,12 @@ import ProfileScreen from './components/ProfileScreen';
 import ProfileSetupScreen from './components/ProfileSetupScreen';
 import RoleOnboardingFlow from './components/RoleOnboardingFlow';
 import SplashScreen from './components/SplashScreen';
+import {
+  clearStoredOnboardingState,
+  getStoredOnboardingState,
+  saveOnboardedProfile,
+  syncProfileFromSupabase,
+} from './services/profileService';
 import { triggerLightHaptic } from './utils/nativeBridge';
 
 const SEARCHABLE_BRANDS = [
@@ -112,19 +118,32 @@ const TABS = [
 ];
 
 export default function App() {
+  const initialStored = useMemo(() => getStoredOnboardingState(), []);
+  const alreadyOnboarded = Boolean(initialStored);
+
   const [showSplash, setShowSplash] = useState(true);
-  const [flowStep, setFlowStep] = useState('onboarding'); // onboarding | setup | role | main
+  const [flowStep, setFlowStep] = useState(
+    alreadyOnboarded ? 'main' : 'onboarding'
+  ); // onboarding | setup | role | main
   const [roleSubStep, setRoleSubStep] = useState('role'); // role | founder-1 | founder-2 | creator-1
-  const [setupData, setSetupData] = useState({
-    name: '',
-    username: '',
-    avatar: avatarDefault,
-  });
-  const [roleDetails, setRoleDetails] = useState(null);
+  const [setupData, setSetupData] = useState(
+    initialStored?.setupData || {
+      name: '',
+      username: '',
+      avatar: avatarDefault,
+    }
+  );
+  const [roleDetails, setRoleDetails] = useState(
+    initialStored?.roleDetails || null
+  );
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [activeTab, setActiveTab] = useState('brands');
+  const [activeTab, setActiveTab] = useState('home');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedUser, setSelectedUser] = useState(USER_PROFILES[0]);
+  const [selectedUser, setSelectedUser] = useState(
+    initialStored?.setupData?.name
+      ? { ...USER_PROFILES[0], name: initialStored.setupData.name }
+      : USER_PROFILES[0]
+  );
   const [offerOpen, setOfferOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [activeChatId, setActiveChatId] = useState(null);
@@ -166,23 +185,42 @@ export default function App() {
   const navKey = JSON.stringify(navSnapshot);
   const prevNavKeyRef = useRef(navKey);
 
-  // Initialize browser history sentinel + root entry so phone back gesture never exits unexpectedly
+  // Initialize browser history sentinel + root entry and sync profile with Supabase
   useEffect(() => {
     const initial = {
-      flowStep: 'onboarding',
+      flowStep: alreadyOnboarded ? 'main' : 'onboarding',
       roleSubStep: 'role',
-      activeTab: 'brands',
+      activeTab: 'home',
       offerOpen: false,
       hasPostModal: false,
+      activeChatId: null,
+      notificationsOpen: false,
     };
     window.history.replaceState({ handoverSentinel: true }, '');
     window.history.pushState({ handoverNav: initial }, '');
     historyReadyRef.current = true;
 
+    if (initialStored) {
+      syncProfileFromSupabase(initialStored).then((synced) => {
+        if (!synced) return;
+        setSetupData((prev) => ({
+          ...prev,
+          ...synced.setupData,
+          avatar: synced.setupData.avatar || prev.avatar,
+        }));
+        if (synced.roleDetails) {
+          setRoleDetails(synced.roleDetails);
+        }
+        if (synced.setupData?.name) {
+          setSelectedUser((prev) => ({ ...prev, name: synced.setupData.name }));
+        }
+      });
+    }
+
     return () => {
       if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
     };
-  }, []);
+  }, [alreadyOnboarded, initialStored]);
 
   // Push history entry whenever user navigates forward in-app
   useEffect(() => {
@@ -302,8 +340,48 @@ export default function App() {
     setFlowStep('role');
   };
 
+  const handleResetOnboarding = () => {
+    clearStoredOnboardingState();
+    setRoleDetails(null);
+    setRoleSubStep('role');
+    setActiveTab('home');
+    setNotificationsOpen(false);
+    setActiveChatId(null);
+    const resetRoot = {
+      flowStep: 'onboarding',
+      roleSubStep: 'role',
+      activeTab: 'home',
+      offerOpen: false,
+      hasPostModal: false,
+      activeChatId: null,
+      notificationsOpen: false,
+    };
+    isPoppingRef.current = true;
+    prevNavKeyRef.current = JSON.stringify(resetRoot);
+    window.history.replaceState({ handoverSentinel: true }, '');
+    window.history.pushState({ handoverNav: resetRoot }, '');
+    setFlowStep('onboarding');
+  };
+
   const handleRoleComplete = (details) => {
     setRoleDetails(details);
+    saveOnboardedProfile({ setupData, roleDetails: details });
+
+    // Set Home Feed as the new root history entry once onboarding is complete
+    const mainRoot = {
+      flowStep: 'main',
+      roleSubStep: 'role',
+      activeTab: 'home',
+      offerOpen: false,
+      hasPostModal: false,
+      activeChatId: null,
+      notificationsOpen: false,
+    };
+    isPoppingRef.current = true;
+    prevNavKeyRef.current = JSON.stringify(mainRoot);
+    window.history.replaceState({ handoverSentinel: true }, '');
+    window.history.pushState({ handoverNav: mainRoot }, '');
+
     setActiveTab('home');
     setFlowStep('main');
   };
@@ -348,6 +426,7 @@ export default function App() {
             selectedPost={selectedPost}
             onSelectPost={setSelectedPost}
             onClosePost={goBackInHistory}
+            onResetOnboarding={handleResetOnboarding}
           />
         ) : activeTab === 'home' && notificationsOpen ? (
           <NotificationsScreen
