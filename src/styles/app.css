@@ -29,10 +29,11 @@ body,
   width: 100%;
   overflow: hidden;
   overscroll-behavior: none;
+  -webkit-touch-callout: none;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #0676e8;
+  background-color: #000000;
 }
 
 /* Desktop preview wrapper keeps mobile proportions while mobile/native fills 100% */
@@ -68,7 +69,7 @@ body,
   user-select: none;
 }
 
-@media (max-width: 600px), (hover: none) and (pointer: coarse) {
+@media (max-width: 600px), (hover: none) and (pointer: coarse), (display-mode: standalone), (display-mode: fullscreen) {
   .viewport-stage {
     background: #000000;
   }

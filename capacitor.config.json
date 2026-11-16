@@ -1,6 +1,6 @@
 {
-  "appId": "com.milesapp.brands",
-  "appName": "Brands",
+  "appId": "com.handover.app",
+  "appName": "Handover",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "ios": {
