@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import avatarDefault from './assets/avatar-default.jpg';
-import avatarJacob from './assets/avatar-jacob.jpg';
 import heroCollage from './assets/hero-collage.png';
 import {
   BackTriangleIcon,
   BrandsTabIcon,
-  CaretDownIcon,
   HomeTabIcon,
   ProfileTabIcon,
   SearchIcon,
@@ -55,12 +53,10 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('brands');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState(USER_PROFILES[0]);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [offerOpen, setOfferOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [exitHint, setExitHint] = useState(false);
 
-  const userAvatar = setupData.avatar || avatarJacob;
   const isPoppingRef = useRef(false);
   const historyReadyRef = useRef(false);
   const lastRootBackRef = useRef(0);
@@ -127,7 +123,6 @@ export default function App() {
         if (!target.hasPostModal) {
           setSelectedPost(null);
         }
-        setMenuOpen(false);
         return;
       }
 
@@ -272,74 +267,21 @@ export default function App() {
         ) : (
           <>
             <div className="screen-content">
-              {/* Top Navigation Row */}
+              {/* Top Navigation Row with Search */}
               <header className="top-bar">
                 <button
                   type="button"
-                  className="back-btn"
+                  className="back-btn top-back-btn"
                   onClick={handleBack}
                   aria-label="Go back"
                 >
                   <BackTriangleIcon />
                 </button>
 
-                <div className="user-pill-wrap">
-                  <button
-                    type="button"
-                    className="user-pill"
-                    onClick={() => {
-                      triggerLightHaptic();
-                      setMenuOpen((prev) => !prev);
-                    }}
-                    aria-expanded={menuOpen}
-                    aria-label="Switch user profile"
-                  >
-                    <img
-                      src={userAvatar}
-                      alt={selectedUser.name}
-                      className="user-avatar"
-                    />
-                    <span className="user-name">{selectedUser.name}</span>
-                    <CaretDownIcon />
-                  </button>
-
-                  {menuOpen && (
-                    <div className="user-menu" role="menu">
-                      {USER_PROFILES.map((profile) => (
-                        <button
-                          key={profile.name}
-                          type="button"
-                          role="menuitem"
-                          className={`user-menu-item ${
-                            selectedUser.name === profile.name ? 'active' : ''
-                          }`}
-                          onClick={() => {
-                            triggerLightHaptic();
-                            setSelectedUser(profile);
-                            setMenuOpen(false);
-                          }}
-                        >
-                          <span className="user-menu-title">{profile.name}</span>
-                          <span className="user-menu-sub">
-                            {profile.name === selectedUser.name && roleDetails
-                              ? roleDetails.role === 'founder'
-                                ? `${roleDetails.companyName} · ${roleDetails.sector}`
-                                : `@${roleDetails.instagram} · Creator`
-                              : profile.miles}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </header>
-
-              {/* Subtitle, Title & Search Pill */}
-              <section className="hero-header">
-                <p className="partner-count">142 partners earning miles</p>
-                <h1 className="screen-title">Brands</h1>
-
-                <label className="search-box" aria-label="Search brands, shops or services">
+                <label
+                  className="search-box top-search-box"
+                  aria-label="Search brands, shops or services"
+                >
                   <SearchIcon />
                   <input
                     type="search"
@@ -349,6 +291,12 @@ export default function App() {
                     placeholder="Search brands, shops or services"
                   />
                 </label>
+              </header>
+
+              {/* Subtitle & Title */}
+              <section className="hero-header">
+                <p className="partner-count">142 partners earning miles</p>
+                <h1 className="screen-title">Brands</h1>
               </section>
 
               {/* Center 3D Hero Illustration */}
