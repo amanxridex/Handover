@@ -237,3 +237,64 @@ export function MicIcon() {
     </svg>
   );
 }
+
+export function BackChevronIcon() {
+  return (
+    <svg width="11" height="18" viewBox="0 0 12 20" fill="none" aria-hidden="true">
+      <path
+        d="M10 2L2 10L10 18"
+        stroke="#FFFFFF"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function PhoneIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M6.6 3.5H9.4C9.95 3.5 10.42 3.88 10.54 4.42L11.2 7.4C11.3 7.86 11.12 8.34 10.74 8.62L9.1 9.85C10.15 12.1 11.9 13.85 14.15 14.9L15.38 13.26C15.66 12.88 16.14 12.7 16.6 12.8L19.58 13.46C20.12 13.58 20.5 14.05 20.5 14.6V17.4C20.5 18.56 19.54 19.5 18.38 19.45C10.65 19.08 4.92 13.35 4.55 5.62C4.5 4.46 5.44 3.5 6.6 3.5Z"
+        stroke="#FCE8C8"
+        strokeWidth="1.7"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function UserInfoIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.6" stroke="#FCE8C8" strokeWidth="1.65" />
+      <circle cx="12" cy="9.6" r="2.4" stroke="#FCE8C8" strokeWidth="1.6" />
+      <path
+        d="M7.6 17.2C8.6 15.35 10.18 14.4 12 14.4C13.82 14.4 15.4 15.35 16.4 17.2"
+        stroke="#FCE8C8"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function PaperPlaneIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M20.5 4.2L3.8 10.8C3.25 11.02 3.27 11.8 3.83 11.99L10.3 14.15L12.46 20.62C12.65 21.18 13.43 21.2 13.65 20.65L20.5 4.2Z"
+        stroke="#1C1C20"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10.3 14.15L15.4 9.05"
+        stroke="#1C1C20"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}

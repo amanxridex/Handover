@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import chatAlice from '../assets/chat-alice.jpg';
 import chatBella from '../assets/chat-bella.jpg';
 import chatCharlie from '../assets/chat-charlie.jpg';
@@ -6,7 +6,14 @@ import chatDavid from '../assets/chat-david.jpg';
 import creation3 from '../assets/creation-3.jpg';
 import creation6 from '../assets/creation-6.jpg';
 import { triggerLightHaptic } from '../utils/nativeBridge';
-import { BackTriangleIcon, ChevronDownIcon, MicIcon } from './Icons';
+import {
+  BackChevronIcon,
+  ChevronDownIcon,
+  MicIcon,
+  PaperPlaneIcon,
+  PhoneIcon,
+  UserInfoIcon,
+} from './Icons';
 
 const INITIAL_CHATS = [
   {
@@ -17,12 +24,31 @@ const INITIAL_CHATS = [
     avatar: chatDavid,
     preview: 'So, are we still going to watch that movie tonight?',
     messages: [
-      { id: 'd1', from: 'them', text: 'Hey! What time are we meeting?' },
+      { id: 'd0', from: 'them', text: 'Also, the soundtrack was 🔥🔥🔥', time: '10:10 PM' },
       {
-        id: 'd2',
-        from: 'them',
-        text: 'So, are we still going to watch that movie tonight?',
+        id: 'd1',
+        from: 'me',
+        text: '100%!\nI actually added one of the tracks to my playlist right after the movie',
+        time: '10:12 PM',
       },
+      { id: 'd2', from: 'them', text: 'Same here 🙌', time: '10:13 PM' },
+      { id: 'd3', from: 'them', text: 'Been listening to it all morning', time: '10:13 PM' },
+      { id: 'd4', from: 'me', text: 'You know what?', time: '10:23 PM' },
+      {
+        id: 'd5',
+        from: 'me',
+        text: "If they ever make a sequel, we're going together. No excuses 😉",
+        time: '10:24 PM',
+      },
+      { id: 'd6', from: 'them', text: 'Deal!', time: '10:26 PM' },
+      { id: 'd7', from: 'them', text: "And popcorn's on you 😋🍿", time: '10:26 PM' },
+      {
+        id: 'd8',
+        from: 'me',
+        text: 'Haha, fine... as long as you bring the drinks!',
+        time: '10:28 PM',
+      },
+      { id: 'd9', from: 'them', text: 'Done ✅', time: '10:31 PM' },
     ],
   },
   {
@@ -33,10 +59,12 @@ const INITIAL_CHATS = [
     avatar: chatCharlie,
     preview: "I can't believe that ending, totally unexpected!",
     messages: [
+      { id: 'c0', from: 'me', text: 'Did you finish watching the finale?', time: '12:51 PM' },
       {
         id: 'c1',
         from: 'them',
         text: "I can't believe that ending, totally unexpected!",
+        time: '12:54 PM',
       },
     ],
   },
@@ -52,6 +80,7 @@ const INITIAL_CHATS = [
         id: 'a1',
         from: 'them',
         text: 'Hey, did you finish the series I recommended?',
+        time: '8:15 PM',
       },
     ],
   },
@@ -67,6 +96,7 @@ const INITIAL_CHATS = [
         id: 'm1',
         from: 'them',
         text: "Don't forget tomorrow starts at 9:00 sharp ⏰",
+        time: '6:40 PM',
       },
     ],
   },
@@ -82,6 +112,7 @@ const INITIAL_CHATS = [
         id: 'i1',
         from: 'them',
         text: 'This soundtrack is stuck in my head all day 😂',
+        time: '3:22 PM',
       },
     ],
   },
@@ -97,6 +128,7 @@ const INITIAL_CHATS = [
         id: 'b1',
         from: 'them',
         text: "Let's catch up this Friday once you're free!",
+        time: '11:05 AM',
       },
     ],
   },
@@ -122,6 +154,15 @@ function ChatSearchIcon() {
   );
 }
 
+function formatCurrentTime() {
+  const now = new Date();
+  let hours = now.getHours();
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  return `${hours}:${minutes} ${ampm}`;
+}
+
 export default function ChatScreen({
   tabs,
   activeTab,
@@ -130,6 +171,7 @@ export default function ChatScreen({
   onOpenThread,
   onCloseThread,
 }) {
+  const messagesEndRef = useRef(null);
   const [chats, setChats] = useState(INITIAL_CHATS);
   const [query, setQuery] = useState('');
   const [storiesOpen, setStoriesOpen] = useState(true);
@@ -151,11 +193,23 @@ export default function ChatScreen({
     [chats, activeThreadId]
   );
 
+  useEffect(() => {
+    if (activeThread) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [activeThread, activeThread?.messages?.length]);
+
+  const showToast = (msg) => {
+    setNotice(msg);
+    setTimeout(() => setNotice(''), 1800);
+  };
+
   const handleSendMessage = (e) => {
     e.preventDefault();
     const text = draft.trim();
     if (!text || !activeThread) return;
     triggerLightHaptic();
+    const nowTime = formatCurrentTime();
     setChats((prev) =>
       prev.map((c) =>
         c.id === activeThread.id
@@ -165,7 +219,7 @@ export default function ChatScreen({
               preview: text,
               messages: [
                 ...c.messages,
-                { id: `me-${Date.now()}`, from: 'me', text },
+                { id: `me-${Date.now()}`, from: 'me', text, time: nowTime },
               ],
             }
           : c
@@ -175,56 +229,112 @@ export default function ChatScreen({
   };
 
   if (activeThread) {
+    const nameParts = activeThread.name.split(' ');
+    const firstName = nameParts[0] || activeThread.name;
+    const restName = nameParts.slice(1).join(' ');
+
     return (
       <section className="chat-thread-screen" aria-label={`Chat with ${activeThread.name}`}>
-        <header className="chat-thread-header">
-          <button
-            type="button"
-            className="back-btn top-back-btn"
-            onClick={() => {
-              triggerLightHaptic();
-              onCloseThread();
-            }}
-            aria-label="Back to chats"
-          >
-            <BackTriangleIcon />
-          </button>
+        {/* Orange Rounded Conversation Container */}
+        <div className="chat-thread-surface">
+          <div className="chat-thread-header-fade" aria-hidden="true" />
 
-          <img
-            src={activeThread.avatar}
-            alt={activeThread.name}
-            className="chat-thread-avatar"
-          />
+          <header className="chat-thread-header">
+            <div className="chat-thread-left">
+              <button
+                type="button"
+                className="chat-thread-back"
+                onClick={() => {
+                  triggerLightHaptic();
+                  onCloseThread();
+                }}
+                aria-label="Back to chats"
+              >
+                <BackChevronIcon />
+              </button>
 
-          <div className="chat-thread-meta">
-            <div className="chat-thread-name">{activeThread.name}</div>
-            <div className="chat-thread-sub">Active now</div>
-          </div>
-        </header>
+              <img
+                src={activeThread.avatar}
+                alt={activeThread.name}
+                className="chat-thread-avatar"
+              />
 
-        <div className="chat-thread-messages">
-          {activeThread.messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`chat-bubble ${msg.from === 'me' ? 'me' : 'them'}`}
-            >
-              {msg.text}
+              <div className="chat-thread-title">
+                <span className="chat-thread-first">{firstName}</span>
+                {restName && <span className="chat-thread-last">{restName}</span>}
+              </div>
             </div>
-          ))}
+
+            <div className="chat-thread-actions">
+              <button
+                type="button"
+                className="chat-thread-pill-btn"
+                onClick={() => {
+                  triggerLightHaptic();
+                  showToast(`Calling ${firstName}...`);
+                }}
+                aria-label={`Call ${activeThread.name}`}
+              >
+                <PhoneIcon />
+              </button>
+              <button
+                type="button"
+                className="chat-thread-pill-btn"
+                onClick={() => {
+                  triggerLightHaptic();
+                  showToast(`${activeThread.name} · Active`);
+                }}
+                aria-label={`${activeThread.name} info`}
+              >
+                <UserInfoIcon />
+              </button>
+            </div>
+          </header>
+
+          <div className="chat-thread-messages">
+            {activeThread.messages.map((msg) => {
+              const isShort = msg.text.length <= 36 && !msg.text.includes('\n');
+              return (
+                <div
+                  key={msg.id}
+                  className={`chat-bubble ${msg.from === 'me' ? 'me' : 'them'} ${
+                    isShort ? 'inline' : 'stacked'
+                  }`}
+                >
+                  <span className="chat-bubble-text">{msg.text}</span>
+                  <span className="chat-bubble-time">{msg.time}</span>
+                </div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
         </div>
 
+        {/* Bottom Dark Composer Dock */}
         <form className="chat-thread-composer" onSubmit={handleSendMessage}>
-          <input
-            type="text"
-            className="chat-thread-input"
-            placeholder={`Message ${activeThread.shortName}...`}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <button type="submit" className="chat-send-btn">
-            Send
-          </button>
+          <div className="chat-composer-pill">
+            <input
+              type="text"
+              className="chat-thread-input"
+              placeholder="Your Message..."
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+            />
+            <button
+              type="submit"
+              className={`chat-send-btn ${draft.trim() ? 'ready' : ''}`}
+              aria-label="Send message"
+            >
+              <PaperPlaneIcon />
+            </button>
+          </div>
         </form>
+
+        {notice && (
+          <div className="feed-toast" role="status">
+            {notice}
+          </div>
+        )}
       </section>
     );
   }
@@ -274,8 +384,7 @@ export default function ChatScreen({
                 className="chat-contact-item"
                 onClick={() => {
                   triggerLightHaptic();
-                  setNotice('Invite a friend to Handover');
-                  setTimeout(() => setNotice(''), 1800);
+                  showToast('Invite a friend to Handover');
                 }}
               >
                 <span className="chat-add-circle">
