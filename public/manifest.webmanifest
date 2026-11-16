@@ -1,0 +1,25 @@
+{
+  "name": "Brands — Earn Miles",
+  "short_name": "Brands",
+  "description": "Discover 142 partners earning miles across dining, retail, beauty, fuel, and grocery.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A84FF",
+  "theme_color": "#0A84FF",
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

@@ -1,0 +1,19 @@
+{
+  "appId": "com.milesapp.brands",
+  "appName": "Brands",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "ios": {
+    "contentInset": "never"
+  },
+  "android": {
+    "backgroundColor": "#0A84FF"
+  },
+  "plugins": {
+    "StatusBar": {
+      "overlaysWebView": true,
+      "style": "LIGHT"
+    }
+  }
+}
+
