@@ -67,6 +67,8 @@ const INITIAL_POSTS = [
 
 export default function HomeFeedScreen({
   currentUser,
+  unreadNotifications,
+  onOpenNotifications,
   onOpenProfile,
   tabs,
   activeTab,
@@ -211,12 +213,14 @@ export default function HomeFeedScreen({
             className="feed-icon-btn"
             onClick={() => {
               triggerLightHaptic();
-              showNotice('6 new notifications');
+              onOpenNotifications();
             }}
-            aria-label="Notifications (6 unread)"
+            aria-label={`Notifications (${unreadNotifications} unread)`}
           >
             <BellIcon />
-            <span className="feed-notif-badge">6</span>
+            {unreadNotifications > 0 && (
+              <span className="feed-notif-badge">{unreadNotifications}</span>
+            )}
           </button>
         </header>
 

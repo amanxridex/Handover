@@ -1,6 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import avatarDefault from './assets/avatar-default.jpg';
+import avatarJacob from './assets/avatar-jacob.jpg';
+import chatAlice from './assets/chat-alice.jpg';
+import chatCharlie from './assets/chat-charlie.jpg';
+import chatDavid from './assets/chat-david.jpg';
+import creation3 from './assets/creation-3.jpg';
+import creation5 from './assets/creation-5.jpg';
+import feedPillowFight from './assets/feed-pillow-fight.jpg';
+import feedWarmPost from './assets/feed-warm-post.jpg';
 import heroCollage from './assets/hero-collage.png';
+import profileHero from './assets/profile-hero.jpg';
 import {
   BackTriangleIcon,
   ChatTabIcon,
@@ -15,8 +24,9 @@ import {
   USER_PROFILES,
 } from './data/brandsData';
 import ChatScreen from './components/ChatScreen';
-import OnboardingScreen from './components/OnboardingScreen';
 import HomeFeedScreen from './components/HomeFeedScreen';
+import NotificationsScreen from './components/NotificationsScreen';
+import OnboardingScreen from './components/OnboardingScreen';
 import ProfileScreen from './components/ProfileScreen';
 import ProfileSetupScreen from './components/ProfileSetupScreen';
 import RoleOnboardingFlow from './components/RoleOnboardingFlow';
@@ -31,6 +41,67 @@ const SEARCHABLE_BRANDS = [
   { name: 'John Lewis', category: 'Retail', rate: '4× miles' },
   { name: 'Sephora', category: 'Beauty', rate: '6× miles' },
   { name: 'Shell', category: 'Fuel', rate: '2× miles' },
+];
+
+const INITIAL_NOTIFICATIONS = [
+  {
+    id: 'n1',
+    type: 'follow',
+    actor: 'Olivia Beits',
+    avatar: profileHero,
+    time: '2m ago',
+    unread: true,
+    followingBack: false,
+  },
+  {
+    id: 'n2',
+    type: 'like',
+    actor: '@Maria Theodor',
+    avatar: creation5,
+    time: '4m ago',
+    unread: true,
+    postTitle: 'Check out my pillow fight with beautiful views',
+    postThumb: feedPillowFight,
+  },
+  {
+    id: 'n3',
+    type: 'comment',
+    actor: '@Alice Johnson',
+    avatar: chatAlice,
+    time: '12m ago',
+    unread: true,
+    comment: 'Those twilight colors are unreal 🔥',
+    postThumb: feedWarmPost,
+  },
+  {
+    id: 'n4',
+    type: 'follow',
+    actor: 'David Smith',
+    avatar: chatDavid,
+    time: '24m ago',
+    unread: true,
+    followingBack: false,
+  },
+  {
+    id: 'n5',
+    type: 'like',
+    actor: '@Charlie Brown',
+    avatar: chatCharlie,
+    time: '38m ago',
+    unread: true,
+    postTitle: 'Golden hour above the skyline',
+    postThumb: feedWarmPost,
+  },
+  {
+    id: 'n6',
+    type: 'comment',
+    actor: '@Jacob Jones',
+    avatar: avatarJacob,
+    time: '2h ago',
+    unread: true,
+    comment: 'Need this exact camera preset!',
+    postThumb: creation3,
+  },
 ];
 
 const TABS = [
@@ -57,12 +128,19 @@ export default function App() {
   const [offerOpen, setOfferOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [activeChatId, setActiveChatId] = useState(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
   const [exitHint, setExitHint] = useState(false);
 
   const isPoppingRef = useRef(false);
   const historyReadyRef = useRef(false);
   const lastRootBackRef = useRef(0);
   const exitTimerRef = useRef(null);
+
+  const unreadNotifications = useMemo(
+    () => notifications.filter((n) => n.unread).length,
+    [notifications]
+  );
 
   const navSnapshot = useMemo(
     () => ({
@@ -72,8 +150,17 @@ export default function App() {
       offerOpen,
       hasPostModal: Boolean(selectedPost),
       activeChatId,
+      notificationsOpen,
     }),
-    [flowStep, roleSubStep, activeTab, offerOpen, selectedPost, activeChatId]
+    [
+      flowStep,
+      roleSubStep,
+      activeTab,
+      offerOpen,
+      selectedPost,
+      activeChatId,
+      notificationsOpen,
+    ]
   );
 
   const navKey = JSON.stringify(navSnapshot);
@@ -127,6 +214,7 @@ export default function App() {
           setSelectedPost(null);
         }
         setActiveChatId(target.activeChatId || null);
+        setNotificationsOpen(Boolean(target.notificationsOpen));
         return;
       }
 
@@ -261,6 +349,32 @@ export default function App() {
             onSelectPost={setSelectedPost}
             onClosePost={goBackInHistory}
           />
+        ) : activeTab === 'home' && notificationsOpen ? (
+          <NotificationsScreen
+            notifications={notifications}
+            onBack={goBackInHistory}
+            onFollowBack={(id) =>
+              setNotifications((prev) =>
+                prev.map((n) =>
+                  n.id === id ? { ...n, followingBack: true, unread: false } : n
+                )
+              )
+            }
+            onMarkAllRead={() =>
+              setNotifications((prev) =>
+                prev.map((n) => ({ ...n, unread: false }))
+              )
+            }
+            onMarkRead={(id) =>
+              setNotifications((prev) =>
+                prev.map((n) => (n.id === id ? { ...n, unread: false } : n))
+              )
+            }
+            onOpenProfile={() => {
+              setNotificationsOpen(false);
+              handleTabSelect('profile');
+            }}
+          />
         ) : activeTab === 'home' ? (
           <HomeFeedScreen
             currentUser={{
@@ -268,6 +382,8 @@ export default function App() {
               username: setupData.username,
               avatar: setupData.avatar,
             }}
+            unreadNotifications={unreadNotifications}
+            onOpenNotifications={() => setNotificationsOpen(true)}
             onOpenProfile={() => handleTabSelect('profile')}
             tabs={TABS}
             activeTab={activeTab}
