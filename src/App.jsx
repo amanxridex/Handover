@@ -20,6 +20,7 @@ import OnboardingScreen from './components/OnboardingScreen';
 import ProfileScreen from './components/ProfileScreen';
 import ProfileSetupScreen from './components/ProfileSetupScreen';
 import RoleOnboardingFlow from './components/RoleOnboardingFlow';
+import SplashScreen from './components/SplashScreen';
 import { triggerLightHaptic } from './utils/nativeBridge';
 
 const SEARCHABLE_BRANDS = [
@@ -40,6 +41,7 @@ const TABS = [
 ];
 
 export default function App() {
+  const [showSplash, setShowSplash] = useState(true);
   const [flowStep, setFlowStep] = useState('onboarding'); // onboarding | setup | role | main
   const [roleSubStep, setRoleSubStep] = useState('role'); // role | founder-1 | founder-2 | creator-1
   const [setupData, setSetupData] = useState({
@@ -475,6 +477,10 @@ export default function App() {
           <div className="app-exit-toast" role="status">
             Swipe back again to exit
           </div>
+        )}
+
+        {showSplash && (
+          <SplashScreen onFinish={() => setShowSplash(false)} />
         )}
       </main>
     </div>
