@@ -30,6 +30,7 @@ import OnboardingScreen from './components/OnboardingScreen';
 import ProfileScreen from './components/ProfileScreen';
 import ProfileSetupScreen from './components/ProfileSetupScreen';
 import RoleOnboardingFlow from './components/RoleOnboardingFlow';
+import SignInScreen from './components/SignInScreen';
 import SplashScreen from './components/SplashScreen';
 import {
   clearStoredOnboardingState,
@@ -118,7 +119,8 @@ const TABS = [
 ];
 
 function routeForSnapshot(snap) {
-  if (!snap || snap.flowStep === 'onboarding') return '/onboarding';
+  if (!snap || snap.flowStep === 'onboarding') return '/auth';
+  if (snap.flowStep === 'signin') return '/signin';
   if (snap.flowStep === 'setup') return '/onboarding/profile';
   if (snap.flowStep === 'role') {
     if (snap.roleSubStep === 'founder-1') return '/onboarding/founder';
@@ -154,7 +156,10 @@ function snapshotFromPathname(pathname, alreadyOnboarded) {
     notificationsOpen: false,
   };
   if (!alreadyOnboarded) {
-    if (path === '/onboarding/profile') return { ...base, flowStep: 'setup' };
+    if (path === '/signin') return { ...base, flowStep: 'signin' };
+    if (path === '/signup' || path === '/onboarding/profile') {
+      return { ...base, flowStep: 'setup' };
+    }
     if (path === '/onboarding/role') return { ...base, flowStep: 'role', roleSubStep: 'role' };
     if (path === '/onboarding/founder') return { ...base, flowStep: 'role', roleSubStep: 'founder-1' };
     if (path === '/onboarding/founder/details') return { ...base, flowStep: 'role', roleSubStep: 'founder-2' };
@@ -204,8 +209,10 @@ export default function App() {
       name: '',
       username: '',
       avatar: avatarDefault,
+      password: '',
     }
   );
+  const [setupError, setSetupError] = useState('');
   const [roleDetails, setRoleDetails] = useState(
     initialStored?.roleDetails || null
   );
@@ -434,6 +441,7 @@ export default function App() {
   };
 
   const handleSetupComplete = (data) => {
+    setSetupError('');
     setSetupData(data);
     if (data.name) {
       setSelectedUser((prev) => ({ ...prev, name: data.name }));
@@ -442,8 +450,38 @@ export default function App() {
     setFlowStep('role');
   };
 
-  const handleResetOnboarding = () => {
+  const enterHomeFeedRoot = () => {
+    const mainRoot = {
+      flowStep: 'main',
+      roleSubStep: 'role',
+      activeTab: 'home',
+      offerOpen: false,
+      hasPostModal: false,
+      activeChatId: null,
+      activeCommentsPostId: null,
+      notificationsOpen: false,
+    };
+    isPoppingRef.current = true;
+    prevNavKeyRef.current = JSON.stringify(mainRoot);
+    window.history.replaceState({ handoverSentinel: true }, '', '/home');
+    window.history.pushState({ handoverNav: mainRoot }, '', '/home');
+
+    setActiveTab('home');
+    setNotificationsOpen(false);
+    setActiveChatId(null);
+    setActiveCommentsPostId(null);
+    setFlowStep('main');
+  };
+
+  const handleLogout = () => {
     clearStoredOnboardingState();
+    setSetupError('');
+    setSetupData({
+      name: '',
+      username: '',
+      avatar: avatarDefault,
+      password: '',
+    });
     setRoleDetails(null);
     setRoleSubStep('role');
     setActiveTab('home');
@@ -462,38 +500,43 @@ export default function App() {
     };
     isPoppingRef.current = true;
     prevNavKeyRef.current = JSON.stringify(resetRoot);
-    window.history.replaceState({ handoverSentinel: true }, '', '/onboarding');
-    window.history.pushState({ handoverNav: resetRoot }, '', '/onboarding');
+    window.history.replaceState({ handoverSentinel: true }, '', '/auth');
+    window.history.pushState({ handoverNav: resetRoot }, '', '/auth');
     setProfileId(null);
     setFlowStep('onboarding');
+  };
+
+  const handleSignInSuccess = (profile) => {
+    setProfileId(profile.id || null);
+    setSetupData(profile.setupData);
+    setRoleDetails(profile.roleDetails);
+    if (profile.setupData?.name) {
+      setSelectedUser((prev) => ({ ...prev, name: profile.setupData.name }));
+    }
+    enterHomeFeedRoot();
   };
 
   const handleRoleComplete = async (details) => {
     setRoleDetails(details);
 
-    // Set Home Feed as the new root history entry once onboarding is complete
-    const mainRoot = {
-      flowStep: 'main',
-      roleSubStep: 'role',
-      activeTab: 'home',
-      offerOpen: false,
-      hasPostModal: false,
-      activeChatId: null,
-      activeCommentsPostId: null,
-      notificationsOpen: false,
-    };
-    isPoppingRef.current = true;
-    prevNavKeyRef.current = JSON.stringify(mainRoot);
-    window.history.replaceState({ handoverSentinel: true }, '', '/home');
-    window.history.pushState({ handoverNav: mainRoot }, '', '/home');
+    const result = await saveOnboardedProfile({
+      setupData,
+      roleDetails: details,
+    });
 
-    setActiveTab('home');
-    setFlowStep('main');
-
-    const saved = await saveOnboardedProfile({ setupData, roleDetails: details });
-    if (saved?.id) {
-      setProfileId(saved.id);
+    if (result?.error === 'USERNAME_TAKEN') {
+      setSetupError(
+        `@${setupData.username} was already claimed — please choose a different username.`
+      );
+      setFlowStep('setup');
+      return;
     }
+
+    if (result?.profile?.id) {
+      setProfileId(result.profile.id);
+    }
+    setSetupData((prev) => ({ ...prev, password: '' }));
+    enterHomeFeedRoot();
   };
 
   return (
@@ -502,23 +545,39 @@ export default function App() {
         className="mobile-screen"
         aria-label={
           flowStep === 'onboarding'
-            ? 'Onboarding screen'
-            : flowStep === 'setup'
-              ? 'Profile setup screen'
-              : flowStep === 'role'
-                ? 'Founder or Creator selection'
-                : activeTab === 'profile'
-                  ? 'Olivia Beits profile screen'
-                  : 'Brands discovery screen'
+            ? 'Welcome and sign in'
+            : flowStep === 'signin'
+              ? 'Sign in screen'
+              : flowStep === 'setup'
+                ? 'Profile setup screen'
+                : flowStep === 'role'
+                  ? 'Founder or Creator selection'
+                  : activeTab === 'profile'
+                    ? 'Olivia Beits profile screen'
+                    : 'Brands discovery screen'
         }
       >
         {flowStep === 'onboarding' ? (
-          <OnboardingScreen onComplete={() => setFlowStep('setup')} />
+          <OnboardingScreen
+            onSignUp={() => setFlowStep('setup')}
+            onSignIn={() => setFlowStep('signin')}
+          />
+        ) : flowStep === 'signin' ? (
+          <SignInScreen
+            onBack={goBackInHistory}
+            onSuccess={handleSignInSuccess}
+            onSwitchToSignUp={() => {
+              setSetupError('');
+              setFlowStep('setup');
+            }}
+          />
         ) : flowStep === 'setup' ? (
           <ProfileSetupScreen
             initialData={setupData}
+            initialError={setupError}
             onBack={goBackInHistory}
             onComplete={handleSetupComplete}
+            onSwitchToSignIn={() => setFlowStep('signin')}
           />
         ) : flowStep === 'role' ? (
           <RoleOnboardingFlow
@@ -536,7 +595,8 @@ export default function App() {
             selectedPost={selectedPost}
             onSelectPost={setSelectedPost}
             onClosePost={goBackInHistory}
-            onResetOnboarding={handleResetOnboarding}
+            onResetOnboarding={handleLogout}
+            onLogout={handleLogout}
           />
         ) : activeTab === 'home' && notificationsOpen ? (
           <NotificationsScreen

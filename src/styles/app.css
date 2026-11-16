@@ -4164,3 +4164,148 @@ body,
 .comments-composer-send:not(:disabled):active {
   transform: scale(0.95);
 }
+
+/* ================================
+   Auth Landing, Sign In & Password
+================================ */
+.onboarding-auth-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.onboarding-signin-btn {
+  width: 100%;
+  height: 48px;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(15, 23, 42, 0.14);
+  background: rgba(255, 255, 255, 0.84);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #334155;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: transform 0.14s ease, border-color 0.14s ease;
+}
+
+.onboarding-signin-btn span {
+  font-weight: 700;
+  color: #1a66ff;
+}
+
+.onboarding-signin-btn:active {
+  transform: scale(0.98);
+}
+
+.setup-password-box {
+  height: 50px;
+  border-radius: 16px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  padding: 0 12px 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.setup-password-box:focus-within {
+  border-color: #1a66ff;
+  box-shadow: 0 0 0 3px rgba(26, 102, 255, 0.12);
+}
+
+.setup-password-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #0f172a;
+  font-family: inherit;
+  font-size: 16px;
+  user-select: text;
+}
+
+.setup-password-input::placeholder {
+  color: #94a3b8;
+}
+
+.setup-password-toggle {
+  border: none;
+  background: rgba(26, 102, 255, 0.08);
+  color: #1a66ff;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.auth-switch-link {
+  margin-top: 10px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 8px 4px;
+  color: #475569;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: center;
+  cursor: pointer;
+}
+
+.auth-switch-link span {
+  color: #1a66ff;
+  font-weight: 700;
+}
+
+.signin-header {
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+
+.signin-fields {
+  flex: 1;
+}
+
+.profile-top-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-logout-pill {
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(15, 23, 42, 0.56);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.14s ease, background-color 0.14s ease;
+}
+
+.profile-logout-pill:active {
+  transform: scale(0.95);
+  background: rgba(15, 23, 42, 0.78);
+}
+
+.profile-more-item.is-danger {
+  color: #ef4444;
+  font-weight: 600;
+}

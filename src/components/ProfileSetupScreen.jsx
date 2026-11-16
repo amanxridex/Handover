@@ -2,16 +2,33 @@ import React, { useEffect, useRef, useState } from 'react';
 import avatarDefault from '../assets/avatar-default.jpg';
 import handoverWordmark from '../assets/logos/handover-wordmark.png';
 import { checkUsernameAvailable } from '../services/profileService';
+import { compressImageFile } from '../utils/imageCompress';
 import { triggerLightHaptic } from '../utils/nativeBridge';
 import { BackTriangleIcon } from './Icons';
 
-export default function ProfileSetupScreen({ initialData, onBack, onComplete }) {
+export default function ProfileSetupScreen({
+  initialData,
+  initialError,
+  onBack,
+  onComplete,
+  onSwitchToSignIn,
+}) {
   const fileInputRef = useRef(null);
   const [avatarSrc, setAvatarSrc] = useState(initialData?.avatar || avatarDefault);
   const [fullName, setFullName] = useState(initialData?.name || '');
   const [username, setUsername] = useState(initialData?.username || '');
+  const [password, setPassword] = useState(initialData?.password || '');
+  const [showPassword, setShowPassword] = useState(false);
   const [checkStatus, setCheckStatus] = useState('idle'); // idle | invalid | checking | available | taken
-  const [errorMsg, setErrorMsg] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(initialError || '');
+
+  useEffect(() => {
+    if (initialError) {
+      setErrorMsg(initialError);
+      setCheckStatus('taken');
+    }
+  }, [initialError]);
 
   useEffect(() => {
     const clean = username.trim().toLowerCase();
@@ -27,7 +44,7 @@ export default function ProfileSetupScreen({ initialData, onBack, onComplete }) 
     let cancelled = false;
     setCheckStatus('checking');
 
-    const minDelay = new Promise((resolve) => setTimeout(resolve, 700));
+    const minDelay = new Promise((resolve) => setTimeout(resolve, 450));
     Promise.all([checkUsernameAvailable(clean), minDelay]).then(
       ([available]) => {
         if (cancelled) return;
@@ -40,16 +57,14 @@ export default function ProfileSetupScreen({ initialData, onBack, onComplete }) 
     };
   }, [username]);
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setAvatarSrc(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
+    const compressed = await compressImageFile(file, 360, 0.84);
+    if (compressed) {
+      setAvatarSrc(compressed);
+    }
+    e.target.value = '';
   };
 
   const handleUsernameChange = (e) => {
@@ -61,15 +76,16 @@ export default function ProfileSetupScreen({ initialData, onBack, onComplete }) 
     setErrorMsg('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     triggerLightHaptic();
 
     if (!fullName.trim()) {
       setErrorMsg('Please enter your full name');
       return;
     }
-    if (!username || checkStatus === 'invalid') {
+    if (!username || username.length < 3 || checkStatus === 'invalid') {
       setErrorMsg('Choose a username with at least 3 characters');
       return;
     }
@@ -78,7 +94,21 @@ export default function ProfileSetupScreen({ initialData, onBack, onComplete }) 
       return;
     }
     if (checkStatus === 'taken') {
-      setErrorMsg('That username is taken — try another one');
+      setErrorMsg('That username is already taken — choose another one');
+      return;
+    }
+    if (!password || password.length < 6) {
+      setErrorMsg('Create a password with at least 6 characters');
+      return;
+    }
+
+    setSubmitting(true);
+    const stillAvailable = await checkUsernameAvailable(username);
+    setSubmitting(false);
+
+    if (!stillAvailable) {
+      setCheckStatus('taken');
+      setErrorMsg(`@${username} was just taken — please pick another username`);
       return;
     }
 
@@ -86,6 +116,7 @@ export default function ProfileSetupScreen({ initialData, onBack, onComplete }) 
       name: fullName.trim(),
       username,
       avatar: avatarSrc,
+      password,
     });
   };
 
@@ -280,10 +311,37 @@ export default function ProfileSetupScreen({ initialData, onBack, onComplete }) 
               )}
               {checkStatus === 'idle' && (
                 <span className="setup-status hint">
-                  Letters, numbers &amp; underscores only (try &ldquo;admin&rdquo;
-                  to test taken)
+                  Unique handle · letters, numbers &amp; underscores only
                 </span>
               )}
+            </div>
+          </div>
+
+          <div className="setup-field-group">
+            <label htmlFor="setup-password" className="setup-label">
+              Create password
+            </label>
+            <div className="setup-password-box">
+              <input
+                id="setup-password"
+                type={showPassword ? 'text' : 'password'}
+                className="setup-password-input"
+                placeholder="At least 6 characters"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setErrorMsg('');
+                }}
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                className="setup-password-toggle"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
             </div>
           </div>
 
@@ -295,9 +353,28 @@ export default function ProfileSetupScreen({ initialData, onBack, onComplete }) 
         </div>
 
         <div className="setup-footer">
-          <button type="submit" className="onboarding-next-btn">
-            <span className="onboarding-next-label">Continue</span>
+          <button
+            type="submit"
+            className="onboarding-next-btn"
+            disabled={submitting}
+          >
+            <span className="onboarding-next-label">
+              {submitting ? 'Checking...' : 'Continue'}
+            </span>
           </button>
+
+          {onSwitchToSignIn && (
+            <button
+              type="button"
+              className="auth-switch-link"
+              onClick={() => {
+                triggerLightHaptic();
+                onSwitchToSignIn();
+              }}
+            >
+              Already have an account? <span>Sign in</span>
+            </button>
+          )}
         </div>
       </form>
     </section>

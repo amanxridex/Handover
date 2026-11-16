@@ -63,6 +63,7 @@ export default function ProfileScreen({
   onSelectPost,
   onClosePost,
   onResetOnboarding,
+  onLogout,
 }) {
   const [isFollowing, setIsFollowing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -100,45 +101,36 @@ export default function ProfileScreen({
           <CloseXIcon />
         </button>
 
-        <div className="profile-more-wrap">
-          <button
-            type="button"
-            className="profile-circle-btn"
-            onClick={() => {
-              triggerLightHaptic();
-              setMenuOpen((prev) => !prev);
-            }}
-            aria-label="More options"
-            aria-expanded={menuOpen}
-          >
-            <MoreDotsIcon />
-          </button>
+        <div className="profile-top-right">
+          {onLogout && (
+            <button
+              type="button"
+              className="profile-logout-pill"
+              onClick={() => {
+                triggerLightHaptic();
+                onLogout();
+              }}
+            >
+              Log out
+            </button>
+          )}
 
-          {menuOpen && (
-            <div className="profile-more-menu" role="menu">
-              <button
-                type="button"
-                role="menuitem"
-                className="profile-more-item"
-                onClick={() => {
-                  triggerLightHaptic();
-                  setMenuOpen(false);
-                }}
-              >
-                Share profile
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="profile-more-item"
-                onClick={() => {
-                  triggerLightHaptic();
-                  setMenuOpen(false);
-                }}
-              >
-                Copy handle (@oliviia_be)
-              </button>
-              {onResetOnboarding && (
+          <div className="profile-more-wrap">
+            <button
+              type="button"
+              className="profile-circle-btn"
+              onClick={() => {
+                triggerLightHaptic();
+                setMenuOpen((prev) => !prev);
+              }}
+              aria-label="More options"
+              aria-expanded={menuOpen}
+            >
+              <MoreDotsIcon />
+            </button>
+
+            {menuOpen && (
+              <div className="profile-more-menu" role="menu">
                 <button
                   type="button"
                   role="menuitem"
@@ -146,14 +138,38 @@ export default function ProfileScreen({
                   onClick={() => {
                     triggerLightHaptic();
                     setMenuOpen(false);
-                    onResetOnboarding();
                   }}
                 >
-                  Restart onboarding
+                  Share profile
                 </button>
-              )}
-            </div>
-          )}
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="profile-more-item"
+                  onClick={() => {
+                    triggerLightHaptic();
+                    setMenuOpen(false);
+                  }}
+                >
+                  Copy handle (@oliviia_be)
+                </button>
+                {(onLogout || onResetOnboarding) && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="profile-more-item is-danger"
+                    onClick={() => {
+                      triggerLightHaptic();
+                      setMenuOpen(false);
+                      (onLogout || onResetOnboarding)();
+                    }}
+                  >
+                    Log out
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

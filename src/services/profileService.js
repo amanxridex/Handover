@@ -42,6 +42,53 @@ function isProfileComplete(record) {
   return false;
 }
 
+function mapDbRowToRecord(data, fallbackAvatar = '', fallbackLogo = '') {
+  return {
+    id: data.id,
+    onboardingCompleted: Boolean(data.onboarding_completed),
+    setupData: {
+      name: data.full_name,
+      username: data.username,
+      avatar: data.avatar_url || fallbackAvatar || '',
+    },
+    roleDetails:
+      data.role === 'founder'
+        ? {
+            role: 'founder',
+            companyName: data.company_name || '',
+            companyLogoUrl: data.company_logo_url || fallbackLogo || '',
+            hasWebsite: Boolean(data.has_website),
+            websiteUrl: data.website_url || '',
+            instagram: data.instagram_handle || '',
+            companyPitch: data.company_pitch || '',
+            sector: data.sector || '',
+          }
+        : {
+            role: 'creator',
+            instagram: data.instagram_handle || '',
+            contentTypes: data.content_types || [],
+          },
+  };
+}
+
+function persistLocalProfile(profileRecord) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(profileRecord));
+  } catch {
+    try {
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          ...profileRecord,
+          setupData: { ...profileRecord.setupData, avatar: '' },
+        })
+      );
+    } catch {
+      // Ignore storage quota errors
+    }
+  }
+}
+
 export function getStoredOnboardingState() {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -62,8 +109,8 @@ export function clearStoredOnboardingState() {
 }
 
 export async function checkUsernameAvailable(username) {
-  const clean = (username || '').trim().toLowerCase();
-  if (!clean || clean.length < 3) return false;
+  const clean = (username || '').trim().toLowerCase().replace(/^@+/, '');
+  if (!clean || !/^[a-z0-9_]{3,20}$/.test(clean)) return false;
   if (RESERVED_USERNAMES.has(clean)) return false;
 
   if (!isSupabaseConfigured || !supabase) {
@@ -80,7 +127,7 @@ export async function checkUsernameAvailable(username) {
     const { data: rows, error: qErr } = await supabase
       .from('profiles')
       .select('id')
-      .eq('username', clean)
+      .ilike('username', clean)
       .limit(1);
     if (!qErr && Array.isArray(rows)) {
       return rows.length === 0;
@@ -93,132 +140,136 @@ export async function checkUsernameAvailable(username) {
 }
 
 export async function saveOnboardedProfile({ setupData, roleDetails }) {
-  const existing = getStoredOnboardingState();
-  const profileRecord = {
-    id: existing?.id || null,
+  const cleanUsername = setupData.username.trim().toLowerCase().replace(/^@+/, '');
+  const localProfile = {
+    id: null,
     onboardingCompleted: true,
     setupData: {
       name: setupData.name.trim(),
-      username: setupData.username.trim().toLowerCase(),
+      username: cleanUsername,
       avatar: setupData.avatar || '',
     },
     roleDetails,
     updatedAt: new Date().toISOString(),
   };
 
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(profileRecord));
-  } catch {
-    try {
-      window.localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          ...profileRecord,
-          setupData: { ...profileRecord.setupData, avatar: '' },
-        })
-      );
-    } catch {
-      // Ignore
-    }
-  }
-
   if (!isSupabaseConfigured || !supabase) {
-    return profileRecord;
+    persistLocalProfile(localProfile);
+    return { profile: localProfile };
   }
 
   try {
-    const payload = {
-      full_name: profileRecord.setupData.name,
-      username: profileRecord.setupData.username,
-      avatar_url: profileRecord.setupData.avatar || null,
-      role: roleDetails.role,
-      company_name:
+    const { data, error } = await supabase.rpc('register_user_profile', {
+      p_full_name: localProfile.setupData.name,
+      p_username: cleanUsername,
+      p_password: setupData.password || '',
+      p_avatar_url: localProfile.setupData.avatar || null,
+      p_role: roleDetails.role,
+      p_company_name:
         roleDetails.role === 'founder' ? roleDetails.companyName : null,
-      company_logo_url:
+      p_company_logo_url:
         roleDetails.role === 'founder'
           ? roleDetails.companyLogoUrl || null
           : null,
-      has_website:
+      p_has_website:
         roleDetails.role === 'founder' ? Boolean(roleDetails.hasWebsite) : null,
-      website_url:
+      p_website_url:
         roleDetails.role === 'founder' ? roleDetails.websiteUrl || null : null,
-      company_pitch:
+      p_company_pitch:
         roleDetails.role === 'founder' ? roleDetails.companyPitch : null,
-      sector: roleDetails.role === 'founder' ? roleDetails.sector : null,
-      content_types:
+      p_sector: roleDetails.role === 'founder' ? roleDetails.sector : null,
+      p_content_types:
         roleDetails.role === 'creator' ? roleDetails.contentTypes || [] : [],
-      instagram_handle: roleDetails.instagram || null,
-      onboarding_completed: true,
-    };
+      p_instagram_handle: roleDetails.instagram || null,
+    });
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .upsert(payload, { onConflict: 'username' })
-      .select('id')
-      .single();
-
-    if (!error && data?.id) {
-      const synced = { ...profileRecord, id: data.id };
-      try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(synced));
-      } catch {
-        // Ignore
+    if (error) {
+      const msg = `${error.code || ''} ${error.message || ''}`;
+      if (msg.includes('23505') || msg.includes('USERNAME_TAKEN')) {
+        return { error: 'USERNAME_TAKEN' };
       }
-      return synced;
+      if (msg.includes('WEAK_PASSWORD')) {
+        return { error: 'WEAK_PASSWORD' };
+      }
+      return { error: error.message || 'REGISTRATION_FAILED' };
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row?.id) {
+      const synced = mapDbRowToRecord(
+        row,
+        localProfile.setupData.avatar,
+        roleDetails.companyLogoUrl
+      );
+      persistLocalProfile(synced);
+      return { profile: synced };
     }
   } catch {
-    // Keep local record if Supabase is unreachable
+    // Keep offline local profile only if network is completely unreachable
   }
 
-  return profileRecord;
+  persistLocalProfile(localProfile);
+  return { profile: localProfile };
+}
+
+export async function loginWithCredentials({ username, password }) {
+  const cleanUsername = (username || '').trim().toLowerCase().replace(/^@+/, '');
+  if (!cleanUsername || !password) {
+    return { error: 'Please enter both username and password' };
+  }
+
+  if (!isSupabaseConfigured || !supabase) {
+    return { error: 'Authentication service is unavailable' };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('login_with_credentials', {
+      p_username: cleanUsername,
+      p_password: password,
+    });
+
+    if (error) {
+      return { error: 'Unable to sign in right now. Please try again.' };
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row?.id) {
+      return { error: 'Invalid @username or password' };
+    }
+
+    const profile = mapDbRowToRecord(row);
+    persistLocalProfile(profile);
+    return { profile };
+  } catch {
+    return { error: 'Network error while signing in. Please try again.' };
+  }
 }
 
 export async function syncProfileFromSupabase(stored) {
   if (!stored || !isSupabaseConfigured || !supabase) return stored;
 
   try {
-    const query = supabase.from('profiles').select('*').limit(1);
+    const query = supabase
+      .from('profiles')
+      .select(
+        'id, full_name, username, avatar_url, role, company_name, company_logo_url, has_website, website_url, company_pitch, sector, content_types, instagram_handle, onboarding_completed'
+      )
+      .limit(1);
+
     const { data, error } = stored.id
       ? await query.eq('id', stored.id).maybeSingle()
-      : await query.eq('username', stored.setupData.username).maybeSingle();
+      : await query.ilike('username', stored.setupData.username).maybeSingle();
 
     if (error || !data || !data.onboarding_completed) {
       return stored;
     }
 
-    const hydrated = {
-      id: data.id,
-      onboardingCompleted: Boolean(data.onboarding_completed),
-      setupData: {
-        name: data.full_name,
-        username: data.username,
-        avatar: data.avatar_url || stored.setupData.avatar,
-      },
-      roleDetails:
-        data.role === 'founder'
-          ? {
-              role: 'founder',
-              companyName: data.company_name || '',
-              companyLogoUrl:
-                data.company_logo_url || stored.roleDetails?.companyLogoUrl || '',
-              hasWebsite: Boolean(data.has_website),
-              websiteUrl: data.website_url || '',
-              instagram: data.instagram_handle || '',
-              companyPitch: data.company_pitch || '',
-              sector: data.sector || '',
-            }
-          : {
-              role: 'creator',
-              instagram: data.instagram_handle || '',
-              contentTypes: data.content_types || [],
-            },
-    };
-
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(hydrated));
-    } catch {
-      // Ignore
-    }
+    const hydrated = mapDbRowToRecord(
+      data,
+      stored.setupData?.avatar,
+      stored.roleDetails?.companyLogoUrl
+    );
+    persistLocalProfile(hydrated);
     return hydrated;
   } catch {
     return stored;
