@@ -17,7 +17,19 @@ export const DEFAULT_SETTINGS = {
   showActivity: true,
   showBadges: true,
   language: 'English',
+  themeMode: 'dark', // dark | light
 };
+
+export function applyThemeMode(mode) {
+  const normalized = mode === 'light' ? 'light' : 'dark';
+  if (typeof document !== 'undefined') {
+    document.documentElement.dataset.theme = normalized;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      meta.setAttribute('content', normalized === 'light' ? '#eff6ff' : '#000000');
+    }
+  }
+}
 
 function readLocalSettings() {
   try {
@@ -28,6 +40,7 @@ function readLocalSettings() {
       ...DEFAULT_SETTINGS,
       ...parsed,
       hasPasscode: Boolean(parsed.hasPasscode || parsed.passcodeHash),
+      themeMode: parsed.themeMode === 'light' ? 'light' : 'dark',
     };
   } catch {
     return { ...DEFAULT_SETTINGS };
@@ -41,11 +54,13 @@ function writeLocalSettings(settings) {
     // Ignore storage quota errors
   }
   setHapticsEnabled(Boolean(settings.hapticsEnabled));
+  applyThemeMode(settings.themeMode);
 }
 
 export function getStoredSettings() {
   const settings = readLocalSettings();
   setHapticsEnabled(Boolean(settings.hapticsEnabled));
+  applyThemeMode(settings.themeMode);
   return settings;
 }
 
@@ -56,6 +71,7 @@ export function clearStoredSettings() {
     // Ignore
   }
   setHapticsEnabled(true);
+  applyThemeMode('dark');
 }
 
 // Local offline fallback PIN hash (used only if Supabase is unconfigured)
@@ -199,12 +215,24 @@ export async function fetchUserSettings(profileId) {
     return local;
   }
   try {
-    const { data, error } = await supabase.rpc('get_authenticated_settings', {
-      p_session_token: token,
-    });
+    const [settingsRes, themeRes] = await Promise.all([
+      supabase.rpc('get_authenticated_settings', {
+        p_session_token: token,
+      }),
+      supabase.rpc('get_theme_mode', {
+        p_session_token: token,
+      }),
+    ]);
 
+    const { data, error } = settingsRes;
     const row = Array.isArray(data) ? data[0] : data;
     if (error || !row) return local;
+
+    const remoteTheme =
+      !themeRes.error &&
+      (themeRes.data === 'light' || themeRes.data === 'dark')
+        ? themeRes.data
+        : local.themeMode;
 
     const merged = {
       ...local,
@@ -239,6 +267,7 @@ export async function fetchUserSettings(profileId) {
           ? row.show_badges
           : local.showBadges,
       language: row.language || local.language,
+      themeMode: remoteTheme,
     };
     writeLocalSettings(merged);
     return merged;
@@ -253,6 +282,10 @@ export async function saveUserSettings(profileId, patch) {
   const next = {
     ...current,
     ...cleanPatch,
+    themeMode:
+      (cleanPatch.themeMode ?? current.themeMode) === 'light'
+        ? 'light'
+        : 'dark',
     hasPasscode: clearPasscode
       ? false
       : newPasscode
@@ -274,20 +307,31 @@ export async function saveUserSettings(profileId, patch) {
   }
 
   try {
-    await supabase.rpc('save_authenticated_settings', {
-      p_session_token: token,
-      p_plan_tier: next.planTier,
-      p_haptics_enabled: Boolean(next.hapticsEnabled),
-      p_biometric_lock_enabled: Boolean(next.biometricLockEnabled),
-      p_new_passcode: newPasscode || null,
-      p_clear_passcode: Boolean(clearPasscode),
-      p_notifications_enabled: Boolean(next.notificationsEnabled),
-      p_private_account: Boolean(next.privateAccount),
-      p_autoplay_media: Boolean(next.autoplayMedia),
-      p_show_activity: Boolean(next.showActivity),
-      p_show_badges: Boolean(next.showBadges),
-      p_language: next.language || 'English',
-    });
+    const rpcCalls = [
+      supabase.rpc('save_authenticated_settings', {
+        p_session_token: token,
+        p_plan_tier: next.planTier,
+        p_haptics_enabled: Boolean(next.hapticsEnabled),
+        p_biometric_lock_enabled: Boolean(next.biometricLockEnabled),
+        p_new_passcode: newPasscode || null,
+        p_clear_passcode: Boolean(clearPasscode),
+        p_notifications_enabled: Boolean(next.notificationsEnabled),
+        p_private_account: Boolean(next.privateAccount),
+        p_autoplay_media: Boolean(next.autoplayMedia),
+        p_show_activity: Boolean(next.showActivity),
+        p_show_badges: Boolean(next.showBadges),
+        p_language: next.language || 'English',
+      }),
+    ];
+    if (cleanPatch.themeMode !== undefined) {
+      rpcCalls.push(
+        supabase.rpc('set_theme_mode', {
+          p_session_token: token,
+          p_theme_mode: next.themeMode,
+        })
+      );
+    }
+    await Promise.all(rpcCalls);
   } catch {
     // Keep local settings even when offline
   }

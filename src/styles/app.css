@@ -97,6 +97,7 @@ body,
   border-radius: 9999px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   display: flex;
@@ -233,6 +234,7 @@ body,
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.44);
+  color: rgba(255, 255, 255, 0.88);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2195,6 +2197,7 @@ body,
   border-radius: 9999px;
   border: 1px solid rgba(96, 165, 250, 0.22);
   background: rgba(18, 42, 108, 0.32);
+  color: #ffffff;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   display: flex;
@@ -2685,6 +2688,7 @@ body,
   height: 36px;
   border-radius: 9999px;
   background: rgba(112, 38, 6, 0.22);
+  color: rgba(255, 255, 255, 0.9);
   padding: 0 13px;
   display: flex;
   align-items: center;
@@ -2964,6 +2968,7 @@ body,
   height: 36px;
   border: none;
   background: transparent;
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3195,6 +3200,7 @@ body,
   border-radius: 9999px;
   border: 1px solid rgba(96, 165, 250, 0.26);
   background: rgba(18, 42, 108, 0.36);
+  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -5330,4 +5336,304 @@ body,
   stroke-dasharray: 24;
   stroke-dashoffset: 0;
   animation: ptrCheckDraw 0.24s ease-out;
+}
+
+
+/* ================================
+   Theme Segmented Toggle & Light Mode
+================================ */
+.settings-theme-row {
+  cursor: default;
+}
+
+.settings-theme-segment {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.settings-theme-opt {
+  border: none;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.72);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+
+.settings-theme-opt.active {
+  background: #1a66ff;
+  color: #ffffff;
+}
+
+/* Light Mode Overrides across App */
+[data-theme='light'],
+[data-theme='light'] body,
+[data-theme='light'] #root,
+[data-theme='light'] .viewport-stage {
+  background-color: #f1f5f9;
+}
+
+[data-theme='light'] .settings-screen {
+  background: linear-gradient(180deg, #e0f2fe 0%, #f8fafc 42%, #ffffff 100%);
+  color: #0f172a;
+}
+
+[data-theme='light'] .settings-glow {
+  background: radial-gradient(circle, rgba(26, 102, 255, 0.18) 0%, rgba(14, 165, 233, 0.08) 50%, transparent 75%);
+}
+
+[data-theme='light'] .settings-top-title,
+[data-theme='light'] .settings-profile-name,
+[data-theme='light'] .settings-pro-title,
+[data-theme='light'] .settings-row-label {
+  color: #0f172a;
+}
+
+[data-theme='light'] .settings-circle-btn {
+  color: #0f172a;
+}
+
+[data-theme='light'] .settings-search-input {
+  background: #ffffff;
+  color: #0f172a;
+  border-color: rgba(26, 102, 255, 0.24);
+}
+
+[data-theme='light'] .settings-profile-card,
+[data-theme='light'] .settings-pro-banner,
+[data-theme='light'] .settings-card-group {
+  border-bottom-color: rgba(15, 23, 42, 0.08);
+}
+
+[data-theme='light'] .settings-pro-banner {
+  background: linear-gradient(90deg, rgba(26, 102, 255, 0.08) 0%, rgba(255, 255, 255, 0) 100%);
+}
+
+[data-theme='light'] .settings-profile-sub,
+[data-theme='light'] .settings-row-value {
+  color: #1d4ed8;
+}
+
+[data-theme='light'] .settings-pro-desc {
+  color: #475569;
+}
+
+[data-theme='light'] .settings-row {
+  border-bottom-color: rgba(15, 23, 42, 0.07);
+}
+
+[data-theme='light'] .settings-row:active {
+  background: rgba(26, 102, 255, 0.08);
+}
+
+[data-theme='light'] .settings-switch {
+  background: #cbd5e1;
+  border-color: #94a3b8;
+}
+
+[data-theme='light'] .settings-switch.is-on {
+  background: #1a66ff;
+  border-color: #1a66ff;
+}
+
+[data-theme='light'] .settings-theme-segment {
+  background: #e2e8f0;
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
+[data-theme='light'] .settings-theme-opt {
+  color: #475569;
+}
+
+[data-theme='light'] .settings-theme-opt.active {
+  background: #1a66ff;
+  color: #ffffff;
+}
+
+[data-theme='light'] .settings-sheet {
+  background: #ffffff;
+  border-top-color: rgba(26, 102, 255, 0.22);
+}
+
+[data-theme='light'] .settings-sheet-handle {
+  background: rgba(15, 23, 42, 0.2);
+}
+
+[data-theme='light'] .settings-sheet-title,
+[data-theme='light'] .settings-pref-title,
+[data-theme='light'] .settings-lang-name,
+[data-theme='light'] .settings-plan-name {
+  color: #0f172a;
+}
+
+[data-theme='light'] .settings-sheet-desc,
+[data-theme='light'] .settings-pref-desc,
+[data-theme='light'] .settings-lang-native,
+[data-theme='light'] .settings-plan-desc,
+[data-theme='light'] .settings-badge-item p {
+  color: #475569;
+}
+
+[data-theme='light'] .settings-sheet-input,
+[data-theme='light'] .settings-sheet-textarea {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+[data-theme='light'] .settings-plan-card,
+[data-theme='light'] .settings-lang-item,
+[data-theme='light'] .settings-badge-item {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #e2e8f0;
+}
+
+[data-theme='light'] .settings-plan-card.selected,
+[data-theme='light'] .settings-lang-item.active {
+  background: #eff6ff;
+  border-color: #1a66ff;
+}
+
+/* Light Mode: Home Feed */
+[data-theme='light'] .feed-screen {
+  background: linear-gradient(180deg, #dbeafe 0%, #f1f5f9 36%, #ffffff 100%);
+}
+
+[data-theme='light'] .feed-title-btn {
+  color: #0f172a;
+}
+
+[data-theme='light'] .feed-icon-btn {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(26, 102, 255, 0.2);
+  color: #0f172a;
+}
+
+[data-theme='light'] .feed-story-capsule {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(26, 102, 255, 0.24);
+}
+
+/* Light Mode: Notifications */
+[data-theme='light'] .notif-screen {
+  background: linear-gradient(180deg, #e0f2fe 0%, #f8fafc 40%, #ffffff 100%);
+}
+
+[data-theme='light'] .notif-title,
+[data-theme='light'] .notif-text,
+[data-theme='light'] .notif-text strong {
+  color: #0f172a;
+}
+
+[data-theme='light'] .notif-item {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+[data-theme='light'] .notif-back-btn {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.12);
+  color: #0f172a;
+}
+
+/* Light Mode: Profile */
+[data-theme='light'] .profile-screen {
+  background: #f8fafc;
+}
+
+[data-theme='light'] .profile-scrim {
+  background: linear-gradient(
+    180deg,
+    rgba(248, 250, 252, 0.08) 0%,
+    rgba(248, 250, 252, 0) 24%,
+    rgba(248, 250, 252, 0.45) 45%,
+    rgba(248, 250, 252, 0.94) 68%,
+    #f8fafc 84%,
+    #f8fafc 100%
+  );
+}
+
+[data-theme='light'] .profile-name,
+[data-theme='light'] .profile-stat-value,
+[data-theme='light'] .profile-empty-title {
+  color: #0f172a;
+}
+
+[data-theme='light'] .profile-handle,
+[data-theme='light'] .profile-stat-label,
+[data-theme='light'] .profile-bio-text,
+[data-theme='light'] .profile-empty-sub {
+  color: #475569;
+}
+
+[data-theme='light'] .profile-follow-btn {
+  background: #1a66ff;
+  color: #ffffff;
+}
+
+[data-theme='light'] .profile-msg-btn {
+  background: rgba(15, 23, 42, 0.08);
+  border-color: rgba(15, 23, 42, 0.14);
+  color: #0f172a;
+}
+
+/* Light Mode: Comments Drawer */
+[data-theme='light'] .comments-drawer-sheet {
+  background: #ffffff;
+  border-top-color: rgba(26, 102, 255, 0.22);
+}
+
+[data-theme='light'] .comments-drawer-title,
+[data-theme='light'] .comment-author-name,
+[data-theme='light'] .comment-text {
+  color: #0f172a;
+}
+
+[data-theme='light'] .comments-context-headline,
+[data-theme='light'] .comment-time,
+[data-theme='light'] .comment-like-btn {
+  color: #64748b;
+}
+
+[data-theme='light'] .comments-post-like-pill,
+[data-theme='light'] .comments-drawer-close {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #e2e8f0;
+}
+
+[data-theme='light'] .comments-composer {
+  background: #ffffff;
+  border-top-color: #e2e8f0;
+}
+
+[data-theme='light'] .comments-composer-input {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+/* Light Mode: Chat List */
+[data-theme='light'] .chat-screen {
+  background: #f8fafc;
+}
+
+[data-theme='light'] .chat-row-name {
+  color: #0f172a;
+}
+
+[data-theme='light'] .chat-row-preview,
+[data-theme='light'] .chat-row-time {
+  color: #64748b;
 }

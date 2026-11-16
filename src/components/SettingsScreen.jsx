@@ -188,6 +188,18 @@ function SettingIcon({ name }) {
           />
         </svg>
       );
+    case 'appearance':
+      return (
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="4.5" stroke={stroke} strokeWidth="1.8" />
+          <path
+            d="M12 2.5V5M12 19V21.5M4.9 4.9L6.7 6.7M17.3 17.3L19.1 19.1M2.5 12H5M19 12H21.5M4.9 19.1L6.7 17.3M17.3 6.7L19.1 4.9"
+            stroke={stroke}
+            strokeWidth="1.7"
+            strokeLinecap="round"
+          />
+        </svg>
+      );
     case 'language':
       return (
         <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
@@ -613,9 +625,47 @@ export default function SettingsScreen({
           )}
         </div>
 
-        {/* Group 2: Preferences, Privacy, Help */}
+        {/* Group 2: Appearance, Preferences, Privacy, Help */}
         <div className="settings-section-label">Preferences &amp; Support</div>
         <div className="settings-card-group">
+          {matchesQuery('appearance theme dark mode light mode') && (
+            <div className="settings-row settings-theme-row">
+              <span className="settings-row-icon">
+                <SettingIcon name="appearance" />
+              </span>
+              <span className="settings-row-label">Appearance</span>
+              <div
+                className="settings-theme-segment"
+                role="group"
+                aria-label="Theme mode"
+              >
+                {['dark', 'light'].map((mode) => {
+                  const active = (settings.themeMode || 'dark') === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={`settings-theme-opt ${active ? 'active' : ''}`}
+                      onClick={async () => {
+                        if (active) return;
+                        triggerLightHaptic();
+                        await onUpdateSettings({ themeMode: mode });
+                        showToast(
+                          mode === 'light'
+                            ? 'Light mode enabled'
+                            : 'Dark mode enabled'
+                        );
+                      }}
+                      aria-pressed={active}
+                    >
+                      {mode === 'light' ? 'Light' : 'Dark'}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {matchesQuery('preferences notifications privacy autoplay') && (
             <button
               type="button"
