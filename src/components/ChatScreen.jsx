@@ -6,6 +6,7 @@ import chatDavid from '../assets/chat-david.jpg';
 import creation3 from '../assets/creation-3.jpg';
 import creation6 from '../assets/creation-6.jpg';
 import { triggerLightHaptic } from '../utils/nativeBridge';
+import BottomNav from './BottomNav';
 import {
   BackChevronIcon,
   ChevronDownIcon,
@@ -445,27 +446,14 @@ export default function ChatScreen({
         </div>
       </div>
 
-      {/* Floating Dark Glass Bottom Nav */}
-      <div className="chat-bottom-fade" aria-hidden="true" />
-      <div className="bottom-nav-wrap feed-bottom-nav-wrap">
-        <nav className="bottom-nav chat-bottom-nav" aria-label="Primary navigation">
-          {tabs.map(({ id, label, Icon }) => {
-            const isActive = activeTab === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                className={`nav-item feed-nav-item ${isActive ? 'active' : ''}`}
-                onClick={() => onSelectTab(id)}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <Icon active={isActive} dark />
-                <span className="nav-label">{label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+      {/* Floating Solid Black Pill Bottom Nav */}
+      <BottomNav
+        tabs={tabs}
+        activeTab={activeTab}
+        onSelectTab={onSelectTab}
+        dark
+        floating
+      />
 
       {notice && (
         <div className="feed-toast" role="status">

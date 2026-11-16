@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import avatarDefault from '../assets/avatar-default.jpg';
 import { fetchUserProfileOverview } from '../services/feedService';
 import { triggerLightHaptic } from '../utils/nativeBridge';
+import BottomNav from './BottomNav';
 import { CloseXIcon } from './Icons';
 
 function GearIcon() {
@@ -26,6 +27,9 @@ export default function ProfileScreen({
   onSelectPost,
   onClosePost,
   onOpenSettings,
+  tabs,
+  activeTab,
+  onSelectTab,
 }) {
   const [toastMsg, setToastMsg] = useState('');
   const [loadingOverview, setLoadingOverview] = useState(true);
@@ -278,6 +282,16 @@ export default function ProfileScreen({
           </div>
         </div>
       </div>
+
+      {tabs && onSelectTab && (
+        <BottomNav
+          tabs={tabs}
+          activeTab={activeTab}
+          onSelectTab={onSelectTab}
+          dark
+          floating
+        />
+      )}
 
       {toastMsg && (
         <div className="profile-toast" role="status">

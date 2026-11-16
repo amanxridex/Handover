@@ -24,6 +24,7 @@ import {
   USER_PROFILES,
 } from './data/brandsData';
 import ChatScreen from './components/ChatScreen';
+import BottomNav from './components/BottomNav';
 import HomeFeedScreen from './components/HomeFeedScreen';
 import NotificationsScreen from './components/NotificationsScreen';
 import OnboardingScreen from './components/OnboardingScreen';
@@ -726,6 +727,9 @@ export default function App() {
             onSelectPost={setSelectedPost}
             onClosePost={goBackInHistory}
             onOpenSettings={() => setSettingsOpen(true)}
+            tabs={TABS}
+            activeTab={activeTab}
+            onSelectTab={handleTabSelect}
           />
         ) : activeTab === 'home' && notificationsOpen ? (
           <NotificationsScreen
@@ -894,25 +898,11 @@ export default function App() {
               </section>
 
               {/* Floating Bottom Tab Navigation */}
-              <div className="bottom-nav-wrap">
-                <nav className="bottom-nav" aria-label="Primary navigation">
-                  {TABS.map(({ id, label, Icon }) => {
-                    const isActive = activeTab === id;
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        className={`nav-item ${isActive ? 'active' : ''}`}
-                        onClick={() => handleTabSelect(id)}
-                        aria-current={isActive ? 'page' : undefined}
-                      >
-                        <Icon active={isActive} />
-                        <span className="nav-label">{label}</span>
-                      </button>
-                    );
-                  })}
-                </nav>
-              </div>
+              <BottomNav
+                tabs={TABS}
+                activeTab={activeTab}
+                onSelectTab={handleTabSelect}
+              />
             </div>
 
             {/* Offer Details Bottom Sheet */}

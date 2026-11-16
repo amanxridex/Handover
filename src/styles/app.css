@@ -597,6 +597,7 @@ body,
   overscroll-behavior-y: contain;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 16px) + 88px);
 }
 
 .profile-scroll::-webkit-scrollbar {

@@ -18,6 +18,7 @@ import {
 } from '../services/feedService';
 import { compressImageFile } from '../utils/imageCompress';
 import { triggerLightHaptic, triggerSuccessHaptic } from '../utils/nativeBridge';
+import BottomNav from './BottomNav';
 import CommentsDrawer from './CommentsDrawer';
 import {
   BellIcon,
@@ -687,27 +688,14 @@ export default function HomeFeedScreen({
         </div>
       </div>
 
-      {/* Floating Dark-Blue Glass Bottom Navigation Bar */}
-      <div className="feed-bottom-fade" aria-hidden="true" />
-      <div className="bottom-nav-wrap feed-bottom-nav-wrap">
-        <nav className="bottom-nav feed-bottom-nav" aria-label="Primary navigation">
-          {tabs.map(({ id, label, Icon }) => {
-            const isActive = activeTab === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                className={`nav-item feed-nav-item ${isActive ? 'active' : ''}`}
-                onClick={() => onSelectTab(id)}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <Icon active={isActive} dark />
-                <span className="nav-label">{label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+      {/* Floating Solid Black Pill Bottom Navigation Bar */}
+      <BottomNav
+        tabs={tabs}
+        activeTab={activeTab}
+        onSelectTab={onSelectTab}
+        dark
+        floating
+      />
 
       {/* Create Post Modal Sheet */}
       {createOpen && (
