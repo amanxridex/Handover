@@ -3,7 +3,7 @@ import avatarDefault from './assets/avatar-default.jpg';
 import heroCollage from './assets/hero-collage.png';
 import {
   BackTriangleIcon,
-  BrandsTabIcon,
+  ChatTabIcon,
   HomeTabIcon,
   ProfileTabIcon,
   SearchIcon,
@@ -14,6 +14,7 @@ import {
   PROMO_BY_CATEGORY,
   USER_PROFILES,
 } from './data/brandsData';
+import ChatScreen from './components/ChatScreen';
 import OnboardingScreen from './components/OnboardingScreen';
 import HomeFeedScreen from './components/HomeFeedScreen';
 import ProfileScreen from './components/ProfileScreen';
@@ -34,7 +35,7 @@ const SEARCHABLE_BRANDS = [
 
 const TABS = [
   { id: 'home', label: 'Home', Icon: HomeTabIcon },
-  { id: 'brands', label: 'Brands', Icon: BrandsTabIcon },
+  { id: 'chat', label: 'Chat', Icon: ChatTabIcon },
   { id: 'search', label: 'Search', Icon: SearchTabIcon },
   { id: 'profile', label: 'Profile', Icon: ProfileTabIcon },
 ];
@@ -55,6 +56,7 @@ export default function App() {
   const [selectedUser, setSelectedUser] = useState(USER_PROFILES[0]);
   const [offerOpen, setOfferOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
+  const [activeChatId, setActiveChatId] = useState(null);
   const [exitHint, setExitHint] = useState(false);
 
   const isPoppingRef = useRef(false);
@@ -69,8 +71,9 @@ export default function App() {
       activeTab,
       offerOpen,
       hasPostModal: Boolean(selectedPost),
+      activeChatId,
     }),
-    [flowStep, roleSubStep, activeTab, offerOpen, selectedPost]
+    [flowStep, roleSubStep, activeTab, offerOpen, selectedPost, activeChatId]
   );
 
   const navKey = JSON.stringify(navSnapshot);
@@ -123,6 +126,7 @@ export default function App() {
         if (!target.hasPostModal) {
           setSelectedPost(null);
         }
+        setActiveChatId(target.activeChatId || null);
         return;
       }
 
@@ -268,6 +272,15 @@ export default function App() {
             tabs={TABS}
             activeTab={activeTab}
             onSelectTab={handleTabSelect}
+          />
+        ) : activeTab === 'chat' ? (
+          <ChatScreen
+            tabs={TABS}
+            activeTab={activeTab}
+            onSelectTab={handleTabSelect}
+            activeThreadId={activeChatId}
+            onOpenThread={(id) => setActiveChatId(id)}
+            onCloseThread={goBackInHistory}
           />
         ) : (
           <>

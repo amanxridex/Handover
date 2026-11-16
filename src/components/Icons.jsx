@@ -54,17 +54,17 @@ export function HomeTabIcon({ active, dark = false }) {
   );
 }
 
-export function BrandsTabIcon({ active, dark = false }) {
+export function ChatTabIcon({ active, dark = false }) {
   const color = active ? (dark ? '#FFFFFF' : '#E11D48') : dark ? 'rgba(255,255,255,0.62)' : '#111827';
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <rect x="4" y="4.5" width="16" height="15" rx="3.4" fill={color} />
       <path
-        d="M8.7 9.4C8.7 11.22 10.18 12.7 12 12.7C13.82 12.7 15.3 11.22 15.3 9.4"
-        stroke={dark ? '#18181D' : '#FFFFFF'}
-        strokeWidth="1.9"
-        strokeLinecap="round"
+        d="M12 3.5C6.85 3.5 2.7 7.15 2.7 11.65C2.7 13.78 3.63 15.72 5.15 17.17L4.22 20.42C4.09 20.88 4.56 21.28 4.99 21.07L8.58 19.35C9.65 19.65 10.8 19.8 12 19.8C17.15 19.8 21.3 16.15 21.3 11.65C21.3 7.15 17.15 3.5 12 3.5Z"
+        fill={color}
       />
+      <circle cx="9.1" cy="11.7" r="1.15" fill={dark ? '#141418' : '#FFFFFF'} />
+      <circle cx="12" cy="11.7" r="1.15" fill={dark ? '#141418' : '#FFFFFF'} />
+      <circle cx="14.9" cy="11.7" r="1.15" fill={dark ? '#141418' : '#FFFFFF'} />
     </svg>
   );
 }
@@ -206,6 +206,33 @@ export function HeartIcon({ filled }) {
         stroke={filled ? '#EF233C' : 'rgba(255,255,255,0.9)'}
         strokeWidth="1.9"
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function MicIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <rect
+        x="9"
+        y="3"
+        width="6"
+        height="11"
+        rx="3"
+        fill="rgba(48, 18, 4, 0.78)"
+      />
+      <path
+        d="M5.5 11.5C5.5 15.09 8.41 18 12 18C15.59 18 18.5 15.09 18.5 11.5"
+        stroke="rgba(48, 18, 4, 0.78)"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M12 18V21.5"
+        stroke="rgba(48, 18, 4, 0.78)"
+        strokeWidth="2"
+        strokeLinecap="round"
       />
     </svg>
   );
