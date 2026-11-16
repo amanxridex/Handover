@@ -193,3 +193,4 @@ $$;
 grant execute on function public.is_username_available(text) to anon, authenticated;
 grant execute on function public.register_user_profile(text, text, text, text, text, text, text, boolean, text, text, text, text[], text) to anon, authenticated;
 grant execute on function public.login_with_credentials(text, text) to anon, authenticated;
+

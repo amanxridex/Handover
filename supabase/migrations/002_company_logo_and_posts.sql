@@ -47,3 +47,4 @@ drop policy if exists "Anyone can insert notifications" on public.notifications;
 create policy "Anyone can insert notifications"
   on public.notifications for insert
   with check (true);
+

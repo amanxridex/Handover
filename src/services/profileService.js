@@ -50,6 +50,7 @@ function mapDbRowToRecord(data, fallbackAvatar = '', fallbackLogo = '') {
       name: data.full_name,
       username: data.username,
       avatar: data.avatar_url || fallbackAvatar || '',
+      bio: data.bio || '',
     },
     roleDetails:
       data.role === 'founder'
@@ -71,7 +72,7 @@ function mapDbRowToRecord(data, fallbackAvatar = '', fallbackLogo = '') {
   };
 }
 
-function persistLocalProfile(profileRecord) {
+export function persistLocalProfile(profileRecord) {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(profileRecord));
   } catch {
@@ -252,7 +253,7 @@ export async function syncProfileFromSupabase(stored) {
     const query = supabase
       .from('profiles')
       .select(
-        'id, full_name, username, avatar_url, role, company_name, company_logo_url, has_website, website_url, company_pitch, sector, content_types, instagram_handle, onboarding_completed'
+        'id, full_name, username, avatar_url, bio, role, company_name, company_logo_url, has_website, website_url, company_pitch, sector, content_types, instagram_handle, onboarding_completed'
       )
       .limit(1);
 

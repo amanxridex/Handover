@@ -22,3 +22,4 @@ export function compressImageFile(file, maxSize = 256, quality = 0.84) {
     reader.readAsDataURL(file);
   });
 }
+

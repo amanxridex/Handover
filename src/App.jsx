@@ -27,17 +27,27 @@ import ChatScreen from './components/ChatScreen';
 import HomeFeedScreen from './components/HomeFeedScreen';
 import NotificationsScreen from './components/NotificationsScreen';
 import OnboardingScreen from './components/OnboardingScreen';
+import PasscodeLockScreen from './components/PasscodeLockScreen';
 import ProfileScreen from './components/ProfileScreen';
 import ProfileSetupScreen from './components/ProfileSetupScreen';
 import RoleOnboardingFlow from './components/RoleOnboardingFlow';
+import SettingsScreen from './components/SettingsScreen';
 import SignInScreen from './components/SignInScreen';
 import SplashScreen from './components/SplashScreen';
 import {
   clearStoredOnboardingState,
   getStoredOnboardingState,
+  persistLocalProfile,
   saveOnboardedProfile,
   syncProfileFromSupabase,
 } from './services/profileService';
+import {
+  clearStoredSettings,
+  DEFAULT_SETTINGS,
+  fetchUserSettings,
+  getStoredSettings,
+  saveUserSettings,
+} from './services/settingsService';
 import { triggerLightHaptic } from './utils/nativeBridge';
 
 const SEARCHABLE_BRANDS = [
@@ -139,7 +149,9 @@ function routeForSnapshot(snap) {
     return snap.activeChatId ? `/chat/${snap.activeChatId}` : '/chat';
   }
   if (snap.activeTab === 'search') return '/search';
-  if (snap.activeTab === 'profile') return '/profile';
+  if (snap.activeTab === 'profile') {
+    return snap.settingsOpen ? '/settings' : '/profile';
+  }
   return '/home';
 }
 
@@ -154,6 +166,7 @@ function snapshotFromPathname(pathname, alreadyOnboarded) {
     activeChatId: null,
     activeCommentsPostId: null,
     notificationsOpen: false,
+    settingsOpen: false,
   };
   if (!alreadyOnboarded) {
     if (path === '/signin') return { ...base, flowStep: 'signin' };
@@ -188,12 +201,16 @@ function snapshotFromPathname(pathname, alreadyOnboarded) {
     };
   }
   if (path === '/search') return { ...base, flowStep: 'main', activeTab: 'search' };
+  if (path === '/settings') {
+    return { ...base, flowStep: 'main', activeTab: 'profile', settingsOpen: true };
+  }
   if (path === '/profile') return { ...base, flowStep: 'main', activeTab: 'profile' };
   return { ...base, flowStep: 'main', activeTab: 'home' };
 }
 
 export default function App() {
   const initialStored = useMemo(() => getStoredOnboardingState(), []);
+  const initialSettings = useMemo(() => getStoredSettings(), []);
   const alreadyOnboarded = Boolean(initialStored);
   const initialRouteSnap = useMemo(
     () => snapshotFromPathname(window.location.pathname, alreadyOnboarded),
@@ -201,6 +218,17 @@ export default function App() {
   );
 
   const [showSplash, setShowSplash] = useState(true);
+  const [settings, setSettings] = useState(initialSettings);
+  const [appLocked, setAppLocked] = useState(
+    Boolean(
+      alreadyOnboarded &&
+        initialSettings.biometricLockEnabled &&
+        initialSettings.passcodeHash
+    )
+  );
+  const [settingsOpen, setSettingsOpen] = useState(
+    Boolean(initialRouteSnap.settingsOpen)
+  );
   const [profileId, setProfileId] = useState(initialStored?.id || null);
   const [flowStep, setFlowStep] = useState(initialRouteSnap.flowStep); // onboarding | setup | role | main
   const [roleSubStep, setRoleSubStep] = useState(initialRouteSnap.roleSubStep); // role | founder-1 | founder-2 | creator-1
@@ -256,6 +284,7 @@ export default function App() {
       activeChatId,
       activeCommentsPostId,
       notificationsOpen,
+      settingsOpen,
     }),
     [
       flowStep,
@@ -266,6 +295,7 @@ export default function App() {
       activeChatId,
       activeCommentsPostId,
       notificationsOpen,
+      settingsOpen,
     ]
   );
 
@@ -294,6 +324,15 @@ export default function App() {
         if (!synced) return;
         if (synced.id) {
           setProfileId(synced.id);
+          fetchUserSettings(synced.id).then((remoteSettings) => {
+            setSettings(remoteSettings);
+            if (
+              remoteSettings.biometricLockEnabled &&
+              remoteSettings.passcodeHash
+            ) {
+              setAppLocked(true);
+            }
+          });
         }
         setSetupData((prev) => ({
           ...prev,
@@ -350,6 +389,7 @@ export default function App() {
         setActiveChatId(target.activeChatId || null);
         setActiveCommentsPostId(target.activeCommentsPostId || null);
         setNotificationsOpen(Boolean(target.notificationsOpen));
+        setSettingsOpen(Boolean(target.settingsOpen));
         return;
       }
 
@@ -372,6 +412,7 @@ export default function App() {
         activeChatId,
         activeCommentsPostId,
         notificationsOpen,
+        settingsOpen,
       };
       window.history.pushState(
         { handoverNav: fallbackSnap },
@@ -391,6 +432,7 @@ export default function App() {
     activeChatId,
     activeCommentsPostId,
     notificationsOpen,
+    settingsOpen,
   ]);
 
   const activePromo = PROMO_BY_CATEGORY[selectedCategory] || PROMO_BY_CATEGORY.All;
@@ -460,6 +502,7 @@ export default function App() {
       activeChatId: null,
       activeCommentsPostId: null,
       notificationsOpen: false,
+      settingsOpen: false,
     };
     isPoppingRef.current = true;
     prevNavKeyRef.current = JSON.stringify(mainRoot);
@@ -470,11 +513,50 @@ export default function App() {
     setNotificationsOpen(false);
     setActiveChatId(null);
     setActiveCommentsPostId(null);
+    setSettingsOpen(false);
     setFlowStep('main');
+  };
+
+  const handleUpdateSettings = async (patch) => {
+    const next = await saveUserSettings(profileId, patch);
+    setSettings(next);
+    return next;
+  };
+
+  const handleProfileUpdated = ({ name, bio, avatar, companyName }) => {
+    const updatedSetup = {
+      ...setupData,
+      name: name ?? setupData.name,
+      bio: bio ?? setupData.bio ?? '',
+      avatar: avatar ?? setupData.avatar,
+    };
+    const updatedRole =
+      roleDetails?.role === 'founder' && companyName !== undefined
+        ? { ...roleDetails, companyName }
+        : roleDetails;
+
+    setSetupData(updatedSetup);
+    if (updatedRole !== roleDetails) {
+      setRoleDetails(updatedRole);
+    }
+    if (name) {
+      setSelectedUser((prev) => ({ ...prev, name }));
+    }
+
+    persistLocalProfile({
+      id: profileId,
+      onboardingCompleted: true,
+      setupData: updatedSetup,
+      roleDetails: updatedRole,
+      updatedAt: new Date().toISOString(),
+    });
   };
 
   const handleLogout = () => {
     clearStoredOnboardingState();
+    clearStoredSettings();
+    setSettings({ ...DEFAULT_SETTINGS });
+    setAppLocked(false);
     setSetupError('');
     setSetupData({
       name: '',
@@ -488,6 +570,7 @@ export default function App() {
     setNotificationsOpen(false);
     setActiveChatId(null);
     setActiveCommentsPostId(null);
+    setSettingsOpen(false);
     const resetRoot = {
       flowStep: 'onboarding',
       roleSubStep: 'role',
@@ -497,6 +580,7 @@ export default function App() {
       activeChatId: null,
       activeCommentsPostId: null,
       notificationsOpen: false,
+      settingsOpen: false,
     };
     isPoppingRef.current = true;
     prevNavKeyRef.current = JSON.stringify(resetRoot);
@@ -506,13 +590,18 @@ export default function App() {
     setFlowStep('onboarding');
   };
 
-  const handleSignInSuccess = (profile) => {
+  const handleSignInSuccess = async (profile) => {
     setProfileId(profile.id || null);
     setSetupData(profile.setupData);
     setRoleDetails(profile.roleDetails);
     if (profile.setupData?.name) {
       setSelectedUser((prev) => ({ ...prev, name: profile.setupData.name }));
     }
+    if (profile.id) {
+      const remoteSettings = await fetchUserSettings(profile.id);
+      setSettings(remoteSettings);
+    }
+    setAppLocked(false);
     enterHomeFeedRoot();
   };
 
@@ -534,6 +623,7 @@ export default function App() {
 
     if (result?.profile?.id) {
       setProfileId(result.profile.id);
+      saveUserSettings(result.profile.id, settings);
     }
     setSetupData((prev) => ({ ...prev, password: '' }));
     enterHomeFeedRoot();
@@ -589,12 +679,30 @@ export default function App() {
             onBackToSetup={goBackInHistory}
             onComplete={handleRoleComplete}
           />
+        ) : activeTab === 'profile' && settingsOpen ? (
+          <SettingsScreen
+            currentUser={{
+              id: profileId,
+              name: selectedUser.name,
+              username: setupData.username,
+              bio: setupData.bio || '',
+              avatar: setupData.avatar,
+            }}
+            roleDetails={roleDetails}
+            settings={settings}
+            onUpdateSettings={handleUpdateSettings}
+            onProfileUpdated={handleProfileUpdated}
+            onTriggerLockTest={() => setAppLocked(true)}
+            onBack={goBackInHistory}
+            onLogout={handleLogout}
+          />
         ) : activeTab === 'profile' ? (
           <ProfileScreen
             onClose={handleCloseProfile}
             selectedPost={selectedPost}
             onSelectPost={setSelectedPost}
             onClosePost={goBackInHistory}
+            onOpenSettings={() => setSettingsOpen(true)}
             onResetOnboarding={handleLogout}
             onLogout={handleLogout}
           />
@@ -823,6 +931,21 @@ export default function App() {
           <div className="app-exit-toast" role="status">
             Swipe back again to exit
           </div>
+        )}
+
+        {appLocked && !showSplash && settings.passcodeHash && (
+          <PasscodeLockScreen
+            mode="unlock"
+            user={{
+              name: selectedUser.name,
+              username: setupData.username,
+              avatar: setupData.avatar,
+            }}
+            storedPasscodeHash={settings.passcodeHash}
+            biometricCredentialId={settings.biometricCredentialId}
+            onUnlocked={() => setAppLocked(false)}
+            onForgotLogout={handleLogout}
+          />
         )}
 
         {showSplash && (

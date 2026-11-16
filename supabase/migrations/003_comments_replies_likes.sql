@@ -93,3 +93,4 @@ insert into public.post_comments (
   ('11111111-1111-4111-8111-000000000004', 'skyline-sunset', null, 'David Smith', 'davidsmith', 'creator', null, 'That sunset gradient over the skyline is unreal!', 5, now() - interval '5 hours'),
   ('11111111-1111-4111-8111-000000000005', 'courtside-dusk', null, 'Charlie Brown', 'charliebrown', 'creator', null, 'Need this exact camera preset for evening courtside shoots.', 7, now() - interval '12 hours')
 on conflict (id) do nothing;
+

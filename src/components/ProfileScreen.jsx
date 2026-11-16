@@ -63,6 +63,7 @@ export default function ProfileScreen({
   onSelectPost,
   onClosePost,
   onResetOnboarding,
+  onOpenSettings,
   onLogout,
 }) {
   const [isFollowing, setIsFollowing] = useState(false);
@@ -131,6 +132,20 @@ export default function ProfileScreen({
 
             {menuOpen && (
               <div className="profile-more-menu" role="menu">
+                {onOpenSettings && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="profile-more-item is-accent"
+                    onClick={() => {
+                      triggerLightHaptic();
+                      setMenuOpen(false);
+                      onOpenSettings();
+                    }}
+                  >
+                    Settings
+                  </button>
+                )}
                 <button
                   type="button"
                   role="menuitem"
