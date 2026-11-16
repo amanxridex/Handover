@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import handoverMark from '../assets/logos/handover-mark.png';
+import handoverMark from '../assets/logos/handover-mark-splash.png';
 import GlassIconReveal from './GlassIconReveal';
 
 export default function SplashScreen({ onFinish }) {

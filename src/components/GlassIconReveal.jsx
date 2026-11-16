@@ -75,7 +75,7 @@ const LOOKS = {
   },
 };
 
-const TEX = 1024;
+const TEX = 512;
 const BOX = 0.75;
 
 function loadImage(src) {
