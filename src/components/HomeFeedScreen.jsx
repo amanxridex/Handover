@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import avatarDefault from '../assets/avatar-default.jpg';
 import avatarJacob from '../assets/avatar-jacob.jpg';
 import creation3 from '../assets/creation-3.jpg';
@@ -17,7 +17,7 @@ import {
   togglePostLikeInDb,
 } from '../services/feedService';
 import { compressImageFile } from '../utils/imageCompress';
-import { triggerLightHaptic } from '../utils/nativeBridge';
+import { triggerLightHaptic, triggerSuccessHaptic } from '../utils/nativeBridge';
 import CommentsDrawer from './CommentsDrawer';
 import {
   BellIcon,
@@ -106,11 +106,18 @@ export default function HomeFeedScreen({
   onSelectTab,
 }) {
   const fileInputRef = useRef(null);
+  const feedScrollRef = useRef(null);
+  const pullStartYRef = useRef(null);
+  const pullStartXRef = useRef(null);
+  const pullTriggeredHapticRef = useRef(false);
+
   const [activeCapsule, setActiveCapsule] = useState('squad-1');
   const [feedMode, setFeedMode] = useState('Feed');
   const [feedMenuOpen, setFeedMenuOpen] = useState(false);
   const [posts, setPosts] = useState(INITIAL_POSTS);
   const [postedNotice, setPostedNotice] = useState('');
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Create Post sheet state
   const [createOpen, setCreateOpen] = useState(false);
@@ -122,61 +129,141 @@ export default function HomeFeedScreen({
     [currentUser?.id]
   );
 
+  const loadFeedData = useCallback(async () => {
+    const remotePosts = await fetchFeedPosts();
+
+    const starterIds = INITIAL_POSTS.map((p) => p.id);
+    const allKeys = [
+      ...new Set([
+        ...starterIds,
+        ...(remotePosts || []).map((p) => String(p.id)),
+      ]),
+    ];
+
+    const engagement = await fetchFeedEngagement({
+      postKeys: allKeys,
+      actorKey,
+    });
+
+    setPosts((prev) => {
+      const remoteList = remotePosts || [];
+      const remoteIds = new Set(remoteList.map((p) => p.id));
+      const merged = [
+        ...remoteList,
+        ...prev.filter((p) => !remoteIds.has(p.id)),
+      ];
+
+      return merged.map((post) => {
+        const key = String(post.id);
+        const counterOverride = engagement.countersByPost?.[key];
+        const dbCommentCount = engagement.commentCountsByPost?.[key];
+        return {
+          ...post,
+          likesCount:
+            counterOverride !== undefined ? counterOverride : post.likesCount,
+          commentsCount:
+            dbCommentCount !== undefined
+              ? dbCommentCount
+              : post.commentsCount || 0,
+          liked: engagement.likedPostKeys?.has(key) || post.liked,
+        };
+      });
+    });
+  }, [actorKey]);
+
   // Load live feed posts + live likes & comment counts from Supabase
   useEffect(() => {
     let active = true;
-    (async () => {
-      const remotePosts = await fetchFeedPosts();
+    loadFeedData().catch(() => {
       if (!active) return;
-
-      const starterIds = INITIAL_POSTS.map((p) => p.id);
-      const allKeys = [
-        ...new Set([
-          ...starterIds,
-          ...(remotePosts || []).map((p) => String(p.id)),
-        ]),
-      ];
-
-      const engagement = await fetchFeedEngagement({
-        postKeys: allKeys,
-        actorKey,
-      });
-      if (!active) return;
-
-      setPosts((prev) => {
-        const remoteList = remotePosts || [];
-        const remoteIds = new Set(remoteList.map((p) => p.id));
-        const merged = [
-          ...remoteList,
-          ...prev.filter((p) => !remoteIds.has(p.id)),
-        ];
-
-        return merged.map((post) => {
-          const key = String(post.id);
-          const counterOverride = engagement.countersByPost?.[key];
-          const dbCommentCount = engagement.commentCountsByPost?.[key];
-          return {
-            ...post,
-            likesCount:
-              counterOverride !== undefined ? counterOverride : post.likesCount,
-            commentsCount:
-              dbCommentCount !== undefined
-                ? dbCommentCount
-                : post.commentsCount || 0,
-            liked: engagement.likedPostKeys?.has(key) || post.liked,
-          };
-        });
-      });
-    })();
-
+    });
     return () => {
       active = false;
     };
-  }, [actorKey]);
+  }, [loadFeedData]);
 
   const showNotice = (msg) => {
     setPostedNotice(msg);
     setTimeout(() => setPostedNotice(''), 1800);
+  };
+
+  const PULL_THRESHOLD = 58;
+
+  const triggerPullRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    setPullDistance(52);
+    try {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistration().then((reg) => {
+          reg?.update().catch(() => {});
+          if (reg?.waiting) {
+            reg.waiting.postMessage('SKIP_WAITING');
+          }
+        });
+      }
+      await Promise.all([
+        loadFeedData(),
+        new Promise((resolve) => setTimeout(resolve, 480)),
+      ]);
+      triggerSuccessHaptic();
+      showNotice('Feed refreshed');
+    } finally {
+      setIsRefreshing(false);
+      setPullDistance(0);
+    }
+  };
+
+  const handleTouchStart = (e) => {
+    if (isRefreshing || createOpen || activeCommentsPostId) return;
+    const scroller = feedScrollRef.current;
+    if (!scroller || scroller.scrollTop > 2) {
+      pullStartYRef.current = null;
+      return;
+    }
+    const touch = e.touches?.[0];
+    if (!touch) return;
+    pullStartYRef.current = touch.clientY;
+    pullStartXRef.current = touch.clientX;
+    pullTriggeredHapticRef.current = false;
+  };
+
+  const handleTouchMove = (e) => {
+    if (pullStartYRef.current === null || isRefreshing) return;
+    const scroller = feedScrollRef.current;
+    if (!scroller || scroller.scrollTop > 2) {
+      pullStartYRef.current = null;
+      setPullDistance(0);
+      return;
+    }
+    const touch = e.touches?.[0];
+    if (!touch) return;
+    const dy = touch.clientY - pullStartYRef.current;
+    const dx = Math.abs(touch.clientX - (pullStartXRef.current || 0));
+
+    // Ignore upward scrolls or horizontal story-capsule swipes
+    if (dy <= 8 || dx > dy) {
+      if (dy <= 0) setPullDistance(0);
+      return;
+    }
+
+    const damped = Math.min(88, Math.pow(dy - 8, 0.84));
+    setPullDistance(damped);
+
+    if (damped >= PULL_THRESHOLD && !pullTriggeredHapticRef.current) {
+      pullTriggeredHapticRef.current = true;
+      triggerLightHaptic();
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (pullStartYRef.current === null) return;
+    pullStartYRef.current = null;
+    if (pullDistance >= PULL_THRESHOLD) {
+      triggerPullRefresh();
+    } else {
+      setPullDistance(0);
+    }
   };
 
   const toggleLike = (postId) => {
@@ -288,8 +375,55 @@ export default function HomeFeedScreen({
 
   return (
     <section className="feed-screen" aria-label="Home feed">
+      {/* Pull-to-refresh Indicator */}
+      {(pullDistance > 4 || isRefreshing) && (
+        <div
+          className={`feed-ptr-indicator ${isRefreshing ? 'is-refreshing' : ''} ${
+            pullDistance >= PULL_THRESHOLD ? 'is-ready' : ''
+          }`}
+          style={{
+            transform: `translate(-50%, ${Math.max(0, pullDistance - 34)}px)`,
+            opacity: Math.min(1, pullDistance / 32),
+          }}
+          aria-live="polite"
+        >
+          <span
+            className={`feed-ptr-spinner ${isRefreshing ? 'spinning' : ''}`}
+            style={
+              isRefreshing
+                ? undefined
+                : { transform: `rotate(${Math.round(pullDistance * 4.5)}deg)` }
+            }
+          />
+          <span className="feed-ptr-label">
+            {isRefreshing
+              ? 'Refreshing...'
+              : pullDistance >= PULL_THRESHOLD
+                ? 'Release to refresh'
+                : 'Pull to refresh'}
+          </span>
+        </div>
+      )}
+
       {/* Scrollable Feed Content */}
-      <div className="feed-scroll">
+      <div
+        ref={feedScrollRef}
+        className="feed-scroll"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        style={
+          pullDistance > 0
+            ? {
+                transform: `translateY(${pullDistance}px)`,
+                transition: pullStartYRef.current
+                  ? 'none'
+                  : 'transform 0.24s cubic-bezier(0.22, 1, 0.36, 1)',
+              }
+            : { transition: 'transform 0.24s cubic-bezier(0.22, 1, 0.36, 1)' }
+        }
+      >
         {/* Top Bar */}
         <header className="feed-top-bar">
           <button
