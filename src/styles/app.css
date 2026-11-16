@@ -2106,77 +2106,26 @@ body,
   -webkit-mask-position: center;
 }
 
-.app-exit-toast {
-  position: absolute;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 26px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 60;
-  background: rgba(17, 24, 39, 0.92);
-  color: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  font-size: 12px;
-  font-weight: 500;
-  padding: 8px 16px;
-  border-radius: 9999px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
-  white-space: nowrap;
-  pointer-events: none;
-}
-
 /* =========================================================
-   Splash Screen (WebGL2 Liquid Glass Reveal)
-   ========================================================= */
-.splash-screen {
-  position: absolute;
-  inset: 0;
-  z-index: 100;
-  background: #000000;
-  transition: opacity 0.42s ease, transform 0.42s ease;
-}
-
-.splash-screen.exiting {
-  opacity: 0;
-  transform: scale(1.03);
-  pointer-events: none;
-}
-
-.splash-canvas {
-  width: 100%;
-  height: 100%;
-}
-
-.glass-reveal-wrap {
-  position: relative;
-  isolation: isolate;
-  cursor: pointer;
-  overflow: hidden;
-  user-select: none;
-}
-
-.glass-reveal-fallback {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  display: block;
-  mask-size: contain;
-  -webkit-mask-size: contain;
-  mask-repeat: no-repeat;
-  -webkit-mask-repeat: no-repeat;
-  mask-position: center;
-  -webkit-mask-position: center;
-}
-
-/* =========================================================
-   Home Feed Screen (Dark Editorial Feed)
+   Home Feed Screen (Midnight Blue Editorial Feed)
    ========================================================= */
 .feed-screen {
   position: relative;
   width: 100%;
   height: 100%;
-  background: #0c0c0f;
+  background:
+    radial-gradient(
+      ellipse 115% 42% at 24% 0%,
+      rgba(20, 94, 250, 0.42) 0%,
+      rgba(10, 50, 165, 0.2) 48%,
+      transparent 78%
+    ),
+    radial-gradient(
+      ellipse 88% 36% at 88% 12%,
+      rgba(59, 130, 246, 0.24) 0%,
+      transparent 72%
+    ),
+    linear-gradient(180deg, #061437 0%, #050b1c 44%, #040712 100%);
   overflow: hidden;
 }
 
@@ -2205,13 +2154,38 @@ body,
   height: 40px;
 }
 
+.feed-logo-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 9999px;
+  border: 1px solid rgba(96, 165, 250, 0.36);
+  background: linear-gradient(
+    145deg,
+    rgba(24, 96, 248, 0.45) 0%,
+    rgba(10, 38, 120, 0.52) 100%
+  );
+  box-shadow: 0 6px 18px rgba(17, 104, 255, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.feed-logo-img {
+  width: 19px;
+  height: 19px;
+  object-fit: contain;
+  display: block;
+}
+
 .feed-icon-btn {
   position: relative;
   width: 38px;
   height: 38px;
   border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  background: rgba(18, 42, 108, 0.32);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2221,7 +2195,7 @@ body,
 
 .feed-icon-btn:active {
   transform: scale(0.92);
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(36, 98, 245, 0.4);
 }
 
 .feed-notif-badge {
@@ -2239,7 +2213,7 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid #0c0c0f;
+  border: 1.5px solid #061437;
 }
 
 .feed-title-wrap {
@@ -2341,8 +2315,8 @@ body,
   width: 34px;
   height: 34px;
   border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  background: rgba(18, 42, 108, 0.32);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2374,11 +2348,11 @@ body,
   gap: 3px;
   padding: 3px;
   border-radius: 9999px;
-  border: 1.5px solid rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid rgba(96, 165, 250, 0.24);
+  background: rgba(16, 36, 92, 0.26);
   flex-shrink: 0;
   cursor: pointer;
-  transition: border-color 0.16s ease, transform 0.14s ease;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.14s ease;
 }
 
 .feed-story-capsule:active {
@@ -2386,7 +2360,8 @@ body,
 }
 
 .feed-story-capsule.active {
-  border-color: #65d42a;
+  border-color: #3b82f6;
+  box-shadow: 0 0 16px rgba(37, 99, 235, 0.42);
 }
 
 .feed-story-avatar {
@@ -2412,7 +2387,7 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid #0c0c0f;
+  border: 1.5px solid #061437;
 }
 
 .feed-cards-list {
@@ -2574,7 +2549,7 @@ body,
   right: 0;
   bottom: 0;
   height: 92px;
-  background: linear-gradient(180deg, transparent 0%, rgba(12, 12, 15, 0.88) 72%, #0c0c0f 100%);
+  background: linear-gradient(180deg, transparent 0%, rgba(5, 10, 25, 0.88) 72%, #040712 100%);
   pointer-events: none;
   z-index: 4;
 }
@@ -2589,11 +2564,11 @@ body,
 }
 
 .feed-bottom-nav {
-  background: rgba(28, 28, 34, 0.84);
+  background: rgba(12, 26, 66, 0.82);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(96, 165, 250, 0.24);
+  box-shadow: 0 12px 32px rgba(2, 10, 38, 0.55);
 }
 
 .feed-nav-item .nav-label {

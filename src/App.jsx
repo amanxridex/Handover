@@ -264,7 +264,6 @@ export default function App() {
           />
         ) : activeTab === 'home' ? (
           <HomeFeedScreen
-            onOpenSearch={() => handleTabSelect('search')}
             onOpenProfile={() => handleTabSelect('profile')}
             tabs={TABS}
             activeTab={activeTab}

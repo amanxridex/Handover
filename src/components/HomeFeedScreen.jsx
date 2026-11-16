@@ -5,6 +5,7 @@ import creation5 from '../assets/creation-5.jpg';
 import creation6 from '../assets/creation-6.jpg';
 import feedPillowFight from '../assets/feed-pillow-fight.jpg';
 import feedWarmPost from '../assets/feed-warm-post.jpg';
+import handoverMark from '../assets/logos/handover-mark.png';
 import profileHero from '../assets/profile-hero.jpg';
 import { triggerLightHaptic } from '../utils/nativeBridge';
 import {
@@ -13,7 +14,6 @@ import {
   CommentBubbleIcon,
   HeartIcon,
   PlusIcon,
-  SearchIcon,
 } from './Icons';
 
 const FEED_CATEGORIES = ['All', 'Groups', 'Personal', 'Work', 'Public'];
@@ -73,7 +73,6 @@ const INITIAL_POSTS = [
 ];
 
 export default function HomeFeedScreen({
-  onOpenSearch,
   onOpenProfile,
   tabs,
   activeTab,
@@ -116,17 +115,13 @@ export default function HomeFeedScreen({
       <div className="feed-scroll">
         {/* Top Bar */}
         <header className="feed-top-bar">
-          <button
-            type="button"
-            className="feed-icon-btn"
-            onClick={() => {
-              triggerLightHaptic();
-              onOpenSearch();
-            }}
-            aria-label="Open search"
-          >
-            <SearchIcon />
-          </button>
+          <div className="feed-logo-badge" aria-label="Handover">
+            <img
+              src={handoverMark}
+              alt="Handover"
+              className="feed-logo-img"
+            />
+          </div>
 
           <div className="feed-title-wrap">
             <button
@@ -346,3 +341,4 @@ export default function HomeFeedScreen({
     </section>
   );
 }
+
