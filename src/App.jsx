@@ -259,6 +259,11 @@ export default function App() {
           />
         ) : activeTab === 'home' ? (
           <HomeFeedScreen
+            currentUser={{
+              name: selectedUser.name,
+              username: setupData.username,
+              avatar: setupData.avatar,
+            }}
             onOpenProfile={() => handleTabSelect('profile')}
             tabs={TABS}
             activeTab={activeTab}

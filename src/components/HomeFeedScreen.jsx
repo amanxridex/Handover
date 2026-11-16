@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
+import avatarDefault from '../assets/avatar-default.jpg';
 import avatarJacob from '../assets/avatar-jacob.jpg';
 import creation3 from '../assets/creation-3.jpg';
 import creation5 from '../assets/creation-5.jpg';
@@ -11,31 +12,26 @@ import { triggerLightHaptic } from '../utils/nativeBridge';
 import {
   BellIcon,
   ChevronDownIcon,
+  CloseXIcon,
   CommentBubbleIcon,
   HeartIcon,
-  PlusIcon,
 } from './Icons';
-
-const FEED_CATEGORIES = ['All', 'Groups', 'Personal', 'Work', 'Public'];
 
 const STORY_CAPSULES = [
   {
     id: 'squad-1',
     avatars: [profileHero, creation5],
     badge: 37,
-    featured: true,
   },
   {
     id: 'squad-2',
     avatars: [creation3, creation6],
     badge: 4,
-    featured: false,
   },
   {
     id: 'squad-3',
     avatars: [avatarJacob, feedWarmPost],
     badge: 86,
-    featured: false,
   },
 ];
 
@@ -47,7 +43,6 @@ const INITIAL_POSTS = [
     avatar: creation5,
     headline: 'Check out my pillow fight with beautiful views',
     image: feedPillowFight,
-    category: 'Personal',
     liked: false,
   },
   {
@@ -57,7 +52,6 @@ const INITIAL_POSTS = [
     avatar: profileHero,
     headline: 'Golden hour above the skyline with my favourite crew',
     image: feedWarmPost,
-    category: 'Groups',
     liked: false,
   },
   {
@@ -67,18 +61,18 @@ const INITIAL_POSTS = [
     avatar: avatarJacob,
     headline: 'Courtside dusk sessions & twilight match point',
     image: creation3,
-    category: 'Public',
     liked: false,
   },
 ];
 
 export default function HomeFeedScreen({
+  currentUser,
   onOpenProfile,
   tabs,
   activeTab,
   onSelectTab,
 }) {
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const fileInputRef = useRef(null);
   const [activeCapsule, setActiveCapsule] = useState('squad-1');
   const [feedMode, setFeedMode] = useState('Feed');
   const [feedMenuOpen, setFeedMenuOpen] = useState(false);
@@ -86,11 +80,15 @@ export default function HomeFeedScreen({
   const [commentDrafts, setCommentDrafts] = useState({});
   const [postedNotice, setPostedNotice] = useState('');
 
-  const visiblePosts =
-    selectedCategory === 'All'
-      ? posts
-      : posts.filter((p) => p.category === selectedCategory);
-  const displayPosts = visiblePosts.length > 0 ? visiblePosts : posts;
+  // Create Post sheet state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newHeadline, setNewHeadline] = useState('');
+  const [newImage, setNewImage] = useState('');
+
+  const showNotice = (msg) => {
+    setPostedNotice(msg);
+    setTimeout(() => setPostedNotice(''), 1800);
+  };
 
   const toggleLike = (postId) => {
     triggerLightHaptic();
@@ -105,8 +103,48 @@ export default function HomeFeedScreen({
     if (!text) return;
     triggerLightHaptic();
     setCommentDrafts((prev) => ({ ...prev, [postId]: '' }));
-    setPostedNotice('Comment added');
-    setTimeout(() => setPostedNotice(''), 1600);
+    showNotice('Comment added');
+  };
+
+  const handlePostPhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setNewImage(reader.result);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePublishPost = (e) => {
+    e.preventDefault();
+    const headline = newHeadline.trim();
+    if (!headline) {
+      showNotice('Write a headline for your post');
+      return;
+    }
+    triggerLightHaptic();
+    const handle = currentUser?.username
+      ? `@${currentUser.username}`
+      : currentUser?.name
+        ? `@${currentUser.name}`
+        : '@you';
+    const created = {
+      id: `post-${Date.now()}`,
+      author: handle,
+      time: 'Just now',
+      avatar: currentUser?.avatar || avatarDefault,
+      headline,
+      image: newImage || feedWarmPost,
+      liked: false,
+    };
+    setPosts((prev) => [created, ...prev]);
+    setNewHeadline('');
+    setNewImage('');
+    setCreateOpen(false);
+    showNotice('Post published!');
   };
 
   return (
@@ -115,13 +153,21 @@ export default function HomeFeedScreen({
       <div className="feed-scroll">
         {/* Top Bar */}
         <header className="feed-top-bar">
-          <div className="feed-logo-badge" aria-label="Handover">
+          <button
+            type="button"
+            className="feed-logo-badge"
+            onClick={() => {
+              triggerLightHaptic();
+              setCreateOpen(true);
+            }}
+            aria-label="Create post"
+          >
             <img
               src={handoverMark}
               alt="Handover"
               className="feed-logo-img"
             />
-          </div>
+          </button>
 
           <div className="feed-title-wrap">
             <button
@@ -165,8 +211,7 @@ export default function HomeFeedScreen({
             className="feed-icon-btn"
             onClick={() => {
               triggerLightHaptic();
-              setPostedNotice('6 new notifications');
-              setTimeout(() => setPostedNotice(''), 1600);
+              showNotice('6 new notifications');
             }}
             aria-label="Notifications (6 unread)"
           >
@@ -174,40 +219,6 @@ export default function HomeFeedScreen({
             <span className="feed-notif-badge">6</span>
           </button>
         </header>
-
-        {/* Category Text Tabs + Plus Button */}
-        <div className="feed-tabs-row">
-          <nav className="feed-tabs-scroll" aria-label="Feed filters">
-            {FEED_CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                className={`feed-tab-link ${
-                  selectedCategory === cat ? 'active' : ''
-                }`}
-                onClick={() => {
-                  triggerLightHaptic();
-                  setSelectedCategory(cat);
-                }}
-              >
-                {cat}
-              </button>
-            ))}
-          </nav>
-
-          <button
-            type="button"
-            className="feed-plus-btn"
-            onClick={() => {
-              triggerLightHaptic();
-              setPostedNotice('Create post coming soon');
-              setTimeout(() => setPostedNotice(''), 1600);
-            }}
-            aria-label="Create post"
-          >
-            <PlusIcon />
-          </button>
-        </div>
 
         {/* Double-Avatar Story Capsules */}
         <div className="feed-stories-row" aria-label="Active groups">
@@ -244,7 +255,7 @@ export default function HomeFeedScreen({
 
         {/* Editorial Feed Cards */}
         <div className="feed-cards-list">
-          {displayPosts.map((post) => (
+          {posts.map((post) => (
             <article key={post.id} className="feed-card">
               <img
                 src={post.image}
@@ -311,7 +322,7 @@ export default function HomeFeedScreen({
         </div>
       </div>
 
-      {/* Floating Dark Glass Bottom Navigation Bar */}
+      {/* Floating Dark-Blue Glass Bottom Navigation Bar */}
       <div className="feed-bottom-fade" aria-hidden="true" />
       <div className="bottom-nav-wrap feed-bottom-nav-wrap">
         <nav className="bottom-nav feed-bottom-nav" aria-label="Primary navigation">
@@ -333,6 +344,71 @@ export default function HomeFeedScreen({
         </nav>
       </div>
 
+      {/* Create Post Modal Sheet */}
+      {createOpen && (
+        <div
+          className="feed-create-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Create post"
+          onClick={() => setCreateOpen(false)}
+        >
+          <form
+            className="feed-create-sheet"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={handlePublishPost}
+          >
+            <div className="feed-create-header">
+              <h2 className="feed-create-title">Create post</h2>
+              <button
+                type="button"
+                className="feed-create-close"
+                onClick={() => setCreateOpen(false)}
+                aria-label="Close create post"
+              >
+                <CloseXIcon />
+              </button>
+            </div>
+
+            <textarea
+              className="setup-textarea feed-create-textarea"
+              rows={3}
+              placeholder="Write something cool to share..."
+              value={newHeadline}
+              onChange={(e) => setNewHeadline(e.target.value)}
+            />
+
+            <button
+              type="button"
+              className="feed-photo-picker"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {newImage ? (
+                <img
+                  src={newImage}
+                  alt="Selected post"
+                  className="feed-photo-preview"
+                />
+              ) : (
+                <span>+ Add a photo from your device</span>
+              )}
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={handlePostPhotoChange}
+            />
+
+            <button type="submit" className="onboarding-next-btn">
+              <span className="onboarding-next-label">Post to Feed</span>
+            </button>
+          </form>
+        </div>
+      )}
+
       {postedNotice && (
         <div className="feed-toast" role="status">
           {postedNotice}
@@ -341,4 +417,3 @@ export default function HomeFeedScreen({
     </section>
   );
 }
-
