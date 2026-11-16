@@ -57,11 +57,15 @@ const MORE_POSTS = [
   },
 ];
 
-export default function ProfileScreen({ onClose }) {
+export default function ProfileScreen({
+  onClose,
+  selectedPost,
+  onSelectPost,
+  onClosePost,
+}) {
   const [isFollowing, setIsFollowing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [messageToast, setMessageToast] = useState(false);
-  const [selectedPost, setSelectedPost] = useState(null);
 
   const handleFollow = () => {
     triggerLightHaptic();
@@ -76,7 +80,7 @@ export default function ProfileScreen({ onClose }) {
 
   const handleOpenPost = (post) => {
     triggerLightHaptic();
-    setSelectedPost(post);
+    onSelectPost(post);
   };
 
   return (
@@ -250,7 +254,7 @@ export default function ProfileScreen({ onClose }) {
           role="dialog"
           aria-modal="true"
           aria-label={selectedPost.title}
-          onClick={() => setSelectedPost(null)}
+          onClick={onClosePost}
         >
           <div className="post-modal-card" onClick={(e) => e.stopPropagation()}>
             <img
@@ -266,7 +270,7 @@ export default function ProfileScreen({ onClose }) {
               <button
                 type="button"
                 className="post-modal-close"
-                onClick={() => setSelectedPost(null)}
+                onClick={onClosePost}
               >
                 Done
               </button>

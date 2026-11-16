@@ -83,24 +83,45 @@ function CreatorIcon() {
   );
 }
 
-export default function RoleOnboardingFlow({ userName, onBackToSetup, onComplete }) {
-  const [subStep, setSubStep] = useState('role'); // role | founder-1 | founder-2 | creator-1
-  const [role, setRole] = useState(''); // founder | creator
+export default function RoleOnboardingFlow({
+  userName,
+  subStep,
+  onSubStepChange,
+  initialData,
+  onSaveDraft,
+  onBackToSetup,
+  onComplete,
+}) {
+  const [role, setRole] = useState(initialData?.role || ''); // founder | creator
   const [errorMsg, setErrorMsg] = useState('');
 
   // Founder state
-  const [companyName, setCompanyName] = useState('');
-  const [hasWebsite, setHasWebsite] = useState(null); // true | false | null
-  const [websiteUrl, setWebsiteUrl] = useState('');
-  const [founderInstagram, setFounderInstagram] = useState('');
-  const [companyPitch, setCompanyPitch] = useState('');
-  const [sector, setSector] = useState('');
-  const [customSector, setCustomSector] = useState('');
+  const [companyName, setCompanyName] = useState(initialData?.companyName || '');
+  const [hasWebsite, setHasWebsite] = useState(
+    initialData?.hasWebsite !== undefined ? initialData.hasWebsite : null
+  ); // true | false | null
+  const [websiteUrl, setWebsiteUrl] = useState(initialData?.websiteUrl || '');
+  const [founderInstagram, setFounderInstagram] = useState(
+    initialData?.founderInstagram || ''
+  );
+  const [companyPitch, setCompanyPitch] = useState(
+    initialData?.companyPitch || ''
+  );
+  const [sector, setSector] = useState(initialData?.sector || '');
+  const [customSector, setCustomSector] = useState(
+    initialData?.customSector || ''
+  );
 
   // Creator state
-  const [creatorInstagram, setCreatorInstagram] = useState('');
-  const [selectedNiches, setSelectedNiches] = useState([]);
-  const [customNiche, setCustomNiche] = useState('');
+  const [creatorInstagram, setCreatorInstagram] = useState(
+    initialData?.creatorInstagram || ''
+  );
+  const [selectedNiches, setSelectedNiches] = useState(
+    initialData?.selectedNiches || []
+  );
+  const [customNiche, setCustomNiche] = useState(
+    initialData?.customNiche || ''
+  );
 
   const displayFirstName = useMemo(() => {
     const clean = (userName || '').trim();
@@ -110,24 +131,37 @@ export default function RoleOnboardingFlow({ userName, onBackToSetup, onComplete
 
   const pitchWordCount = useMemo(() => countWords(companyPitch), [companyPitch]);
 
+  const buildDraft = (overrides = {}) => ({
+    role,
+    companyName,
+    hasWebsite,
+    websiteUrl,
+    founderInstagram,
+    companyPitch,
+    sector,
+    customSector,
+    creatorInstagram,
+    selectedNiches,
+    customNiche,
+    ...overrides,
+  });
+
   const handleBack = () => {
     triggerLightHaptic();
     setErrorMsg('');
-    if (subStep === 'role') {
-      onBackToSetup();
-      return;
+    if (onSaveDraft) {
+      onSaveDraft(buildDraft());
     }
-    if (subStep === 'founder-2') {
-      setSubStep('founder-1');
-      return;
-    }
-    setSubStep('role');
+    onBackToSetup();
   };
 
   const handleSelectRole = (chosenRole) => {
     triggerLightHaptic();
     setRole(chosenRole);
     setErrorMsg('');
+    if (onSaveDraft) {
+      onSaveDraft(buildDraft({ role: chosenRole }));
+    }
   };
 
   const handleRoleContinue = () => {
@@ -137,7 +171,10 @@ export default function RoleOnboardingFlow({ userName, onBackToSetup, onComplete
       return;
     }
     setErrorMsg('');
-    setSubStep(role === 'founder' ? 'founder-1' : 'creator-1');
+    if (onSaveDraft) {
+      onSaveDraft(buildDraft());
+    }
+    onSubStepChange(role === 'founder' ? 'founder-1' : 'creator-1');
   };
 
   const handleFounderStep1Next = (e) => {
@@ -160,7 +197,10 @@ export default function RoleOnboardingFlow({ userName, onBackToSetup, onComplete
       return;
     }
     setErrorMsg('');
-    setSubStep('founder-2');
+    if (onSaveDraft) {
+      onSaveDraft(buildDraft());
+    }
+    onSubStepChange('founder-2');
   };
 
   const handleFounderSubmit = (e) => {
@@ -178,7 +218,12 @@ export default function RoleOnboardingFlow({ userName, onBackToSetup, onComplete
       setErrorMsg('Please type your sector');
       return;
     }
+    const draft = buildDraft();
+    if (onSaveDraft) {
+      onSaveDraft(draft);
+    }
     onComplete({
+      ...draft,
       role: 'founder',
       companyName: companyName.trim(),
       hasWebsite,
@@ -212,7 +257,12 @@ export default function RoleOnboardingFlow({ userName, onBackToSetup, onComplete
       setErrorMsg('Please describe your content type');
       return;
     }
+    const draft = buildDraft();
+    if (onSaveDraft) {
+      onSaveDraft(draft);
+    }
     onComplete({
+      ...draft,
       role: 'creator',
       instagram: creatorInstagram.trim(),
       contentTypes: selectedNiches.includes('Others')

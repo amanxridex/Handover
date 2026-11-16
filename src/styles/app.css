@@ -29,6 +29,7 @@ body,
   width: 100%;
   overflow: hidden;
   overscroll-behavior: none;
+  overscroll-behavior-x: none;
   -webkit-touch-callout: none;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -2040,4 +2041,24 @@ body,
   .profile-bio-card {
     margin-top: 12px;
   }
+}
+
+.app-exit-toast {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 26px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  background: rgba(17, 24, 39, 0.92);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  pointer-events: none;
 }

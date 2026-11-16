@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import avatarDefault from './assets/avatar-default.jpg';
 import avatarJacob from './assets/avatar-jacob.jpg';
 import heroCollage from './assets/hero-collage.png';
 import {
@@ -40,7 +41,12 @@ const TABS = [
 
 export default function App() {
   const [flowStep, setFlowStep] = useState('onboarding'); // onboarding | setup | role | main
-  const [userAvatar, setUserAvatar] = useState(avatarJacob);
+  const [roleSubStep, setRoleSubStep] = useState('role'); // role | founder-1 | founder-2 | creator-1
+  const [setupData, setSetupData] = useState({
+    name: '',
+    username: '',
+    avatar: avatarDefault,
+  });
   const [roleDetails, setRoleDetails] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [activeTab, setActiveTab] = useState('brands');
@@ -48,6 +54,107 @@ export default function App() {
   const [selectedUser, setSelectedUser] = useState(USER_PROFILES[0]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [offerOpen, setOfferOpen] = useState(false);
+  const [selectedPost, setSelectedPost] = useState(null);
+  const [exitHint, setExitHint] = useState(false);
+
+  const userAvatar = setupData.avatar || avatarJacob;
+  const isPoppingRef = useRef(false);
+  const historyReadyRef = useRef(false);
+  const lastRootBackRef = useRef(0);
+  const exitTimerRef = useRef(null);
+
+  const navSnapshot = useMemo(
+    () => ({
+      flowStep,
+      roleSubStep,
+      activeTab,
+      offerOpen,
+      hasPostModal: Boolean(selectedPost),
+    }),
+    [flowStep, roleSubStep, activeTab, offerOpen, selectedPost]
+  );
+
+  const navKey = JSON.stringify(navSnapshot);
+  const prevNavKeyRef = useRef(navKey);
+
+  // Initialize browser history sentinel + root entry so phone back gesture never exits unexpectedly
+  useEffect(() => {
+    const initial = {
+      flowStep: 'onboarding',
+      roleSubStep: 'role',
+      activeTab: 'brands',
+      offerOpen: false,
+      hasPostModal: false,
+    };
+    window.history.replaceState({ handoverSentinel: true }, '');
+    window.history.pushState({ handoverNav: initial }, '');
+    historyReadyRef.current = true;
+
+    return () => {
+      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
+    };
+  }, []);
+
+  // Push history entry whenever user navigates forward in-app
+  useEffect(() => {
+    if (!historyReadyRef.current) return;
+    if (isPoppingRef.current) {
+      isPoppingRef.current = false;
+      prevNavKeyRef.current = navKey;
+      return;
+    }
+    if (prevNavKeyRef.current !== navKey) {
+      prevNavKeyRef.current = navKey;
+      window.history.pushState({ handoverNav: navSnapshot }, '');
+    }
+  }, [navKey, navSnapshot]);
+
+  // Handle OS back gesture / browser back button
+  useEffect(() => {
+    const onPopState = (event) => {
+      const state = event.state;
+
+      if (state?.handoverNav) {
+        isPoppingRef.current = true;
+        const target = state.handoverNav;
+        setFlowStep(target.flowStep);
+        setRoleSubStep(target.roleSubStep || 'role');
+        setActiveTab(target.activeTab || 'brands');
+        setOfferOpen(Boolean(target.offerOpen));
+        if (!target.hasPostModal) {
+          setSelectedPost(null);
+        }
+        setMenuOpen(false);
+        return;
+      }
+
+      // Hit root sentinel: keep user inside app unless they intentionally swipe twice within 1.8s
+      const now = Date.now();
+      if (now - lastRootBackRef.current < 1800) {
+        return;
+      }
+      lastRootBackRef.current = now;
+      setExitHint(true);
+      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
+      exitTimerRef.current = setTimeout(() => setExitHint(false), 1800);
+
+      window.history.pushState(
+        {
+          handoverNav: {
+            flowStep,
+            roleSubStep,
+            activeTab,
+            offerOpen,
+            hasPostModal: Boolean(selectedPost),
+          },
+        },
+        ''
+      );
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [flowStep, roleSubStep, activeTab, offerOpen, selectedPost]);
 
   const activePromo = PROMO_BY_CATEGORY[selectedCategory] || PROMO_BY_CATEGORY.All;
 
@@ -61,6 +168,10 @@ export default function App() {
     );
   }, [searchQuery]);
 
+  const goBackInHistory = useCallback(() => {
+    window.history.back();
+  }, []);
+
   const handleCategorySelect = (cat) => {
     triggerLightHaptic();
     setSelectedCategory(cat);
@@ -72,13 +183,13 @@ export default function App() {
   };
 
   const handleCloseProfile = () => {
-    setActiveTab('brands');
+    goBackInHistory();
   };
 
   const handleBack = () => {
     triggerLightHaptic();
     if (offerOpen) {
-      setOfferOpen(false);
+      goBackInHistory();
       return;
     }
     if (searchQuery) {
@@ -89,25 +200,21 @@ export default function App() {
       setSelectedCategory('All');
       return;
     }
-    if (activeTab !== 'brands') {
-      setActiveTab('brands');
-      return;
-    }
-    setFlowStep('role');
+    goBackInHistory();
   };
 
-  const handleSetupComplete = ({ name, avatar }) => {
-    if (avatar) {
-      setUserAvatar(avatar);
+  const handleSetupComplete = (data) => {
+    setSetupData(data);
+    if (data.name) {
+      setSelectedUser((prev) => ({ ...prev, name: data.name }));
     }
-    if (name) {
-      setSelectedUser((prev) => ({ ...prev, name }));
-    }
+    setRoleSubStep('role');
     setFlowStep('role');
   };
 
   const handleRoleComplete = (details) => {
     setRoleDetails(details);
+    setActiveTab('brands');
     setFlowStep('main');
   };
 
@@ -131,17 +238,27 @@ export default function App() {
           <OnboardingScreen onComplete={() => setFlowStep('setup')} />
         ) : flowStep === 'setup' ? (
           <ProfileSetupScreen
-            onBack={() => setFlowStep('onboarding')}
+            initialData={setupData}
+            onBack={goBackInHistory}
             onComplete={handleSetupComplete}
           />
         ) : flowStep === 'role' ? (
           <RoleOnboardingFlow
             userName={selectedUser.name}
-            onBackToSetup={() => setFlowStep('setup')}
+            subStep={roleSubStep}
+            onSubStepChange={setRoleSubStep}
+            initialData={roleDetails}
+            onSaveDraft={setRoleDetails}
+            onBackToSetup={goBackInHistory}
             onComplete={handleRoleComplete}
           />
         ) : activeTab === 'profile' ? (
-          <ProfileScreen onClose={handleCloseProfile} />
+          <ProfileScreen
+            onClose={handleCloseProfile}
+            selectedPost={selectedPost}
+            onSelectPost={setSelectedPost}
+            onClosePost={goBackInHistory}
+          />
         ) : (
           <>
             <div className="screen-content">
@@ -183,8 +300,9 @@ export default function App() {
                           key={profile.name}
                           type="button"
                           role="menuitem"
-                          className={`user-menu-item ${selectedUser.name === profile.name ? 'active' : ''
-                            }`}
+                          className={`user-menu-item ${
+                            selectedUser.name === profile.name ? 'active' : ''
+                          }`}
                           onClick={() => {
                             triggerLightHaptic();
                             setSelectedUser(profile);
@@ -327,7 +445,7 @@ export default function App() {
                 role="dialog"
                 aria-modal="true"
                 aria-label={activePromo.title}
-                onClick={() => setOfferOpen(false)}
+                onClick={goBackInHistory}
               >
                 <div className="offer-sheet" onClick={(e) => e.stopPropagation()}>
                   <div className="sheet-handle" />
@@ -342,7 +460,7 @@ export default function App() {
                     className="offer-cta"
                     onClick={() => {
                       triggerLightHaptic();
-                      setOfferOpen(false);
+                      goBackInHistory();
                     }}
                   >
                     Activate offer
@@ -352,8 +470,13 @@ export default function App() {
             )}
           </>
         )}
+
+        {exitHint && (
+          <div className="app-exit-toast" role="status">
+            Swipe back again to exit
+          </div>
+        )}
       </main>
     </div>
   );
 }
-

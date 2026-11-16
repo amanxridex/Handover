@@ -14,11 +14,11 @@ const RESERVED_USERNAMES = new Set([
   'taken',
 ]);
 
-export default function ProfileSetupScreen({ onBack, onComplete }) {
+export default function ProfileSetupScreen({ initialData, onBack, onComplete }) {
   const fileInputRef = useRef(null);
-  const [avatarSrc, setAvatarSrc] = useState(avatarDefault);
-  const [fullName, setFullName] = useState('');
-  const [username, setUsername] = useState('');
+  const [avatarSrc, setAvatarSrc] = useState(initialData?.avatar || avatarDefault);
+  const [fullName, setFullName] = useState(initialData?.name || '');
+  const [username, setUsername] = useState(initialData?.username || '');
   const [checkStatus, setCheckStatus] = useState('idle'); // idle | invalid | checking | available | taken
   const [errorMsg, setErrorMsg] = useState('');
 
