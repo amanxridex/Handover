@@ -5220,7 +5220,7 @@ body,
 
 
 /* ================================
-   Pull-to-Refresh Indicator
+   Kinetic Aurora Pull-to-Refresh
 ================================ */
 @keyframes ptrSpin {
   from {
@@ -5231,43 +5231,100 @@ body,
   }
 }
 
-.feed-ptr-indicator {
+@keyframes ptrRipple {
+  0% {
+    transform: scale(0.75);
+    opacity: 0.72;
+  }
+  100% {
+    transform: scale(1.95);
+    opacity: 0;
+  }
+}
+
+@keyframes ptrPopBounce {
+  0% {
+    transform: scale(0.85);
+  }
+  55% {
+    transform: scale(1.22);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes ptrCheckDraw {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.feed-ptr-aurora {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  background: radial-gradient(
+    ellipse 78% 100% at 50% 0%,
+    rgba(26, 102, 255, 0.48) 0%,
+    rgba(56, 189, 248, 0.16) 48%,
+    rgba(6, 20, 55, 0) 100%
+  );
+  pointer-events: none;
+  transition: height 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease;
+}
+
+.feed-ptr-stage {
   position: absolute;
   top: max(env(safe-area-inset-top, 0px), 10px);
   left: 50%;
   z-index: 25;
-  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 13px;
-  border-radius: 9999px;
-  background: rgba(11, 25, 62, 0.92);
-  border: 1px solid rgba(96, 165, 250, 0.35);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+  justify-content: center;
   pointer-events: none;
 }
 
-.feed-ptr-spinner {
-  width: 15px;
-  height: 15px;
+.feed-ptr-orb {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.55));
+  transition: transform 0.16s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.feed-ptr-stage.is-ready:not(.is-refreshing) .feed-ptr-orb {
+  animation: ptrPopBounce 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  filter: drop-shadow(0 0 14px rgba(56, 189, 248, 0.85));
+}
+
+.feed-ptr-stage.is-refreshing .feed-ptr-orb {
+  animation: ptrSpin 0.72s linear infinite;
+}
+
+.feed-ptr-ripple {
+  position: absolute;
+  inset: 0;
   border-radius: 9999px;
-  border: 2px solid rgba(96, 165, 250, 0.28);
-  border-top-color: #60a5fa;
-  display: inline-block;
-  flex-shrink: 0;
+  border: 2px solid rgba(56, 189, 248, 0.65);
+  animation: ptrRipple 1.05s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
 
-.feed-ptr-indicator.is-ready .feed-ptr-spinner {
-  border-top-color: #ffffff;
+.feed-ptr-stage.is-done .feed-ptr-orb {
+  animation: ptrPopBounce 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.feed-ptr-spinner.spinning {
-  animation: ptrSpin 0.7s linear infinite;
-}
-
-.feed-ptr-label {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #e2e8f0;
-  white-space: nowrap;
+.feed-ptr-check {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 0;
+  animation: ptrCheckDraw 0.24s ease-out;
 }

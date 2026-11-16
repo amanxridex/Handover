@@ -118,6 +118,7 @@ export default function HomeFeedScreen({
   const [postedNotice, setPostedNotice] = useState('');
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshDone, setRefreshDone] = useState(false);
 
   // Create Post sheet state
   const [createOpen, setCreateOpen] = useState(false);
@@ -192,7 +193,8 @@ export default function HomeFeedScreen({
   const triggerPullRefresh = async () => {
     if (isRefreshing) return;
     setIsRefreshing(true);
-    setPullDistance(52);
+    setRefreshDone(false);
+    setPullDistance(62);
     try {
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistration().then((reg) => {
@@ -204,12 +206,15 @@ export default function HomeFeedScreen({
       }
       await Promise.all([
         loadFeedData(),
-        new Promise((resolve) => setTimeout(resolve, 480)),
+        new Promise((resolve) => setTimeout(resolve, 680)),
       ]);
       triggerSuccessHaptic();
-      showNotice('Feed refreshed');
+      setIsRefreshing(false);
+      setRefreshDone(true);
+      await new Promise((resolve) => setTimeout(resolve, 360));
     } finally {
       setIsRefreshing(false);
+      setRefreshDone(false);
       setPullDistance(0);
     }
   };
@@ -373,35 +378,91 @@ export default function HomeFeedScreen({
     }
   };
 
+  const pullProgress = Math.min(1, pullDistance / PULL_THRESHOLD);
+  const ptrVisible = pullDistance > 4 || isRefreshing || refreshDone;
+  const arcCircumference = 2 * Math.PI * 12;
+  const arcDashOffset =
+    arcCircumference * (1 - (isRefreshing ? 0.72 : pullProgress));
+
   return (
     <section className="feed-screen" aria-label="Home feed">
-      {/* Pull-to-refresh Indicator */}
-      {(pullDistance > 4 || isRefreshing) && (
+      {/* Liquid Top Aurora Pull Glow */}
+      {ptrVisible && (
         <div
-          className={`feed-ptr-indicator ${isRefreshing ? 'is-refreshing' : ''} ${
-            pullDistance >= PULL_THRESHOLD ? 'is-ready' : ''
-          }`}
+          className={`feed-ptr-aurora ${isRefreshing ? 'is-refreshing' : ''}`}
           style={{
-            transform: `translate(-50%, ${Math.max(0, pullDistance - 34)}px)`,
-            opacity: Math.min(1, pullDistance / 32),
+            height: `${Math.max(48, pullDistance + 44)}px`,
+            opacity: isRefreshing || refreshDone ? 1 : Math.min(0.95, pullProgress),
+          }}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Kinetic Ring Pull-to-Refresh Indicator */}
+      {ptrVisible && (
+        <div
+          className={`feed-ptr-stage ${isRefreshing ? 'is-refreshing' : ''} ${
+            refreshDone ? 'is-done' : ''
+          } ${pullDistance >= PULL_THRESHOLD ? 'is-ready' : ''}`}
+          style={{
+            transform: `translate(-50%, ${Math.max(0, pullDistance * 0.45)}px)`,
+            opacity: isRefreshing || refreshDone ? 1 : Math.min(1, pullProgress * 1.25),
           }}
           aria-live="polite"
+          aria-label={isRefreshing ? 'Refreshing feed' : 'Pull to refresh'}
         >
-          <span
-            className={`feed-ptr-spinner ${isRefreshing ? 'spinning' : ''}`}
+          {isRefreshing && <span className="feed-ptr-ripple" aria-hidden="true" />}
+
+          <div
+            className="feed-ptr-orb"
             style={
-              isRefreshing
+              isRefreshing || refreshDone
                 ? undefined
-                : { transform: `rotate(${Math.round(pullDistance * 4.5)}deg)` }
+                : {
+                    transform: `scale(${0.68 + pullProgress * 0.38}) rotate(${Math.round(
+                      pullProgress * 220
+                    )}deg)`,
+                  }
             }
-          />
-          <span className="feed-ptr-label">
-            {isRefreshing
-              ? 'Refreshing...'
-              : pullDistance >= PULL_THRESHOLD
-                ? 'Release to refresh'
-                : 'Pull to refresh'}
-          </span>
+          >
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <defs>
+                <linearGradient id="ptrRingGrad" x1="0" y1="0" x2="32" y2="32">
+                  <stop stopColor="#38BDF8" />
+                  <stop offset="1" stopColor="#1A66FF" />
+                </linearGradient>
+              </defs>
+              <circle
+                cx="16"
+                cy="16"
+                r="12"
+                stroke="rgba(96, 165, 250, 0.22)"
+                strokeWidth="2.5"
+              />
+              {!refreshDone ? (
+                <circle
+                  cx="16"
+                  cy="16"
+                  r="12"
+                  stroke="url(#ptrRingGrad)"
+                  strokeWidth="2.8"
+                  strokeLinecap="round"
+                  strokeDasharray={arcCircumference}
+                  strokeDashoffset={arcDashOffset}
+                  transform="rotate(-90 16 16)"
+                />
+              ) : (
+                <path
+                  className="feed-ptr-check"
+                  d="M10.5 16.5L14.2 20.2L21.8 12.2"
+                  stroke="#38BDF8"
+                  strokeWidth="2.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              )}
+            </svg>
+          </div>
         </div>
       )}
 
