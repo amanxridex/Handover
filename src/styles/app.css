@@ -2133,8 +2133,7 @@ body,
 }
 
 .feed-scroll {
-  flex: 1;
-  min-height: 0;
+  height: 100%;
   width: 100%;
   overflow-y: auto;
   overflow-x: hidden;
@@ -2143,7 +2142,7 @@ body,
   scrollbar-width: none;
   -ms-overflow-style: none;
   padding-top: max(env(safe-area-inset-top, 0px), 14px);
-  padding-bottom: 16px;
+  padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 16px) + 84px);
 }
 
 .feed-scroll::-webkit-scrollbar {
@@ -2501,21 +2500,25 @@ body,
 }
 
 .feed-bottom-nav-wrap {
-  position: relative;
-  flex-shrink: 0;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
   padding: 8px 24px max(env(safe-area-inset-bottom, 0px), 16px);
+  pointer-events: none;
   z-index: 10;
 }
 
 .feed-bottom-nav {
+  pointer-events: auto;
   height: 60px;
   border-radius: 9999px;
-  background: rgba(12, 26, 66, 0.88);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(96, 165, 250, 0.24);
-  box-shadow: 0 12px 32px rgba(2, 10, 38, 0.55);
+  background: #000000;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.68);
   padding: 0 14px;
 }
 
@@ -2637,15 +2640,14 @@ body,
 }
 
 .chat-scroll {
-  flex: 1;
-  min-height: 0;
+  height: 100%;
   width: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
   scrollbar-width: none;
-  padding-bottom: 16px;
+  padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 16px) + 84px);
 }
 
 .chat-scroll::-webkit-scrollbar {
@@ -2877,13 +2879,14 @@ body,
 }
 
 .chat-bottom-nav {
+  pointer-events: auto;
   height: 60px;
   border-radius: 9999px;
-  background: rgba(22, 22, 26, 0.9);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: #000000;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.68);
   padding: 0 14px;
 }
 
