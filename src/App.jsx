@@ -5,11 +5,11 @@ import heroCollage from './assets/hero-collage.png';
 import {
   BackTriangleIcon,
   BrandsTabIcon,
-  CardsTabIcon,
   CaretDownIcon,
   HomeTabIcon,
   ProfileTabIcon,
   SearchIcon,
+  SearchTabIcon,
 } from './components/Icons';
 import {
   CATEGORIES,
@@ -36,7 +36,7 @@ const SEARCHABLE_BRANDS = [
 const TABS = [
   { id: 'home', label: 'Home', Icon: HomeTabIcon },
   { id: 'brands', label: 'Brands', Icon: BrandsTabIcon },
-  { id: 'cards', label: 'My cards', Icon: CardsTabIcon },
+  { id: 'search', label: 'Search', Icon: SearchTabIcon },
   { id: 'profile', label: 'Profile', Icon: ProfileTabIcon },
 ];
 

@@ -69,17 +69,17 @@ export function BrandsTabIcon({ active }) {
   );
 }
 
-export function CardsTabIcon({ active }) {
+export function SearchTabIcon({ active }) {
   const color = active ? '#E11D48' : '#111827';
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="10.5" cy="10.5" r="6" stroke={color} strokeWidth="2.3" />
       <path
-        d="M5.5 6.8C5.5 5.6 6.47 4.6 7.67 4.6H16.33C17.53 4.6 18.5 5.6 18.5 6.8V7.6H5.5V6.8Z"
-        fill={color}
-        opacity="0.82"
+        d="M15.2 15.2L19.6 19.6"
+        stroke={color}
+        strokeWidth="2.3"
+        strokeLinecap="round"
       />
-      <rect x="3.5" y="8.4" width="17" height="11.2" rx="2.8" fill={color} />
-      <rect x="6.2" y="11" width="4.2" height="1.6" rx="0.8" fill="#FFFFFF" />
     </svg>
   );
 }

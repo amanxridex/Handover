@@ -2105,3 +2105,66 @@ body,
   mask-position: center;
   -webkit-mask-position: center;
 }
+
+.app-exit-toast {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 26px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  background: rgba(17, 24, 39, 0.92);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* =========================================================
+   Splash Screen (WebGL2 Liquid Glass Reveal)
+   ========================================================= */
+.splash-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  background: #000000;
+  transition: opacity 0.42s ease, transform 0.42s ease;
+}
+
+.splash-screen.exiting {
+  opacity: 0;
+  transform: scale(1.03);
+  pointer-events: none;
+}
+
+.splash-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.glass-reveal-wrap {
+  position: relative;
+  isolation: isolate;
+  cursor: pointer;
+  overflow: hidden;
+  user-select: none;
+}
+
+.glass-reveal-fallback {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  display: block;
+  mask-size: contain;
+  -webkit-mask-size: contain;
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-position: center;
+}
