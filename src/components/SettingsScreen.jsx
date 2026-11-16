@@ -508,6 +508,7 @@ export default function SettingsScreen({
         </div>
 
         {/* Group 1: Security, Plan, Badges, Haptics, Biometric */}
+        <div className="settings-section-label">Account &amp; Security</div>
         <div className="settings-card-group">
           {matchesQuery('passcode security lock settings') && (
             <button
@@ -613,6 +614,7 @@ export default function SettingsScreen({
         </div>
 
         {/* Group 2: Preferences, Privacy, Help */}
+        <div className="settings-section-label">Preferences &amp; Support</div>
         <div className="settings-card-group">
           {matchesQuery('preferences notifications privacy autoplay') && (
             <button
@@ -674,6 +676,7 @@ export default function SettingsScreen({
         </div>
 
         {/* Group 3: Feedback & Language */}
+        <div className="settings-section-label">Feedback &amp; App</div>
         <div className="settings-card-group">
           {matchesQuery('feedback rating review') && (
             <button

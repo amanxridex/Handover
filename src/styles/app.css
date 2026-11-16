@@ -24,8 +24,9 @@
 html,
 body,
 #root {
+  position: fixed;
+  inset: 0;
   height: 100%;
-  height: 100dvh;
   width: 100%;
   overflow: hidden;
   overscroll-behavior: none;
@@ -34,26 +35,26 @@ body,
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #000000;
+  background-color: #050a18;
 }
 
-/* Desktop preview wrapper keeps mobile proportions while mobile/native fills 100% */
+/* Native full-viewport shell across all devices */
 .viewport-stage {
   width: 100%;
   height: 100%;
-  height: 100dvh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: radial-gradient(circle at 50% 20%, #1d4ed8 0%, #082046 100%);
+  flex-direction: column;
+  overflow: hidden;
+  background: #050a18;
 }
 
 .mobile-screen {
   position: relative;
   width: 100%;
-  max-width: 393px;
-  height: min(852px, 95dvh);
-  border-radius: 40px;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -66,22 +67,7 @@ body,
     #d6ecfe 91%,
     var(--sky-bottom) 100%
   );
-  box-shadow: 0 28px 70px rgba(2, 16, 48, 0.48), 0 0 0 1px rgba(255, 255, 255, 0.14);
   user-select: none;
-}
-
-@media (max-width: 600px), (hover: none) and (pointer: coarse), (display-mode: standalone), (display-mode: fullscreen) {
-  .viewport-stage {
-    background: #000000;
-  }
-
-  .mobile-screen {
-    max-width: 100%;
-    width: 100%;
-    height: 100dvh;
-    border-radius: 0;
-    box-shadow: none;
-  }
 }
 
 .screen-content {
@@ -477,19 +463,23 @@ body,
 
 /* Floating Bottom Navigation Bar */
 .bottom-nav-wrap {
-  padding: 14px 28px max(env(safe-area-inset-bottom, 0px), 18px);
+  padding: 0;
   flex-shrink: 0;
+  width: 100%;
 }
 
 .bottom-nav {
-  height: 62px;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 10px 30px rgba(10, 50, 110, 0.13), 0 2px 6px rgba(10, 50, 110, 0.06);
+  width: 100%;
+  min-height: 58px;
+  height: auto;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: none;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   align-items: center;
-  padding: 0 14px;
+  padding: 8px 8px max(env(safe-area-inset-bottom, 0px), 10px);
 }
 
 .nav-item {
@@ -855,20 +845,18 @@ body,
 }
 
 .profile-bio-card {
-  margin-top: 18px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  padding: 12px 14px;
+  margin-top: 14px;
+  padding: 2px 4px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
 }
 
 .profile-bio-text {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 400;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.86);
+  line-height: 1.48;
+  color: rgba(255, 255, 255, 0.84);
 }
 
 .profile-gallery {
@@ -2125,6 +2113,9 @@ body,
   position: relative;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   background:
     radial-gradient(
       ellipse 115% 42% at 24% 0%,
@@ -2142,15 +2133,17 @@ body,
 }
 
 .feed-scroll {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  padding-top: max(env(safe-area-inset-top, 0px), 16px);
-  padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 16px) + 84px);
+  padding-top: max(env(safe-area-inset-top, 0px), 14px);
+  padding-bottom: 16px;
 }
 
 .feed-scroll::-webkit-scrollbar {
@@ -2504,31 +2497,29 @@ body,
 }
 
 .feed-bottom-fade {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 92px;
-  background: linear-gradient(180deg, transparent 0%, rgba(5, 10, 25, 0.88) 72%, #040712 100%);
-  pointer-events: none;
-  z-index: 4;
+  display: none;
 }
 
 .feed-bottom-nav-wrap {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 5;
-  padding-top: 8px;
+  position: relative;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 0;
+  z-index: 10;
 }
 
 .feed-bottom-nav {
-  background: rgba(12, 26, 66, 0.82);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(96, 165, 250, 0.24);
-  box-shadow: 0 12px 32px rgba(2, 10, 38, 0.55);
+  width: 100%;
+  height: auto;
+  min-height: 58px;
+  border-radius: 0;
+  background: rgba(5, 11, 28, 0.96);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: none;
+  border-top: 1px solid rgba(96, 165, 250, 0.16);
+  box-shadow: none;
+  padding: 8px 8px max(env(safe-area-inset-bottom, 0px), 10px);
 }
 
 .feed-nav-item .nav-label {
@@ -2641,18 +2632,23 @@ body,
   position: relative;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   background: #09090b;
   overflow: hidden;
 }
 
 .chat-scroll {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
   scrollbar-width: none;
-  padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 16px) + 86px);
+  padding-bottom: 16px;
 }
 
 .chat-scroll::-webkit-scrollbar {
@@ -2880,22 +2876,21 @@ body,
 }
 
 .chat-bottom-fade {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 92px;
-  background: linear-gradient(180deg, transparent 0%, rgba(9, 9, 11, 0.9) 72%, #09090b 100%);
-  pointer-events: none;
-  z-index: 4;
+  display: none;
 }
 
 .chat-bottom-nav {
-  background: rgba(22, 22, 26, 0.86);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  width: 100%;
+  height: auto;
+  min-height: 58px;
+  border-radius: 0;
+  background: rgba(12, 12, 16, 0.96);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+  padding: 8px 8px max(env(safe-area-inset-bottom, 0px), 10px);
 }
 
 /* Conversation Thread View (Warm Amber-Orange Surface + Black Dock) */
@@ -4356,10 +4351,8 @@ body,
   width: 38px;
   height: 38px;
   border-radius: 9999px;
-  border: 1px solid rgba(96, 165, 250, 0.24);
-  background: rgba(15, 31, 68, 0.72);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border: none;
+  background: transparent;
   color: #e2e8f0;
   display: flex;
   align-items: center;
@@ -4370,7 +4363,16 @@ body,
 
 .settings-circle-btn:active {
   transform: scale(0.92);
-  background: rgba(26, 102, 255, 0.32);
+  background: rgba(26, 102, 255, 0.24);
+}
+
+.settings-section-label {
+  padding: 18px 18px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #60a5fa;
 }
 
 .settings-top-title {
@@ -4410,13 +4412,15 @@ body,
   z-index: 2;
   flex: 1;
   min-height: 0;
+  width: 100%;
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding: 6px 16px max(env(safe-area-inset-bottom, 0px), 28px);
+  padding: 4px 0 max(env(safe-area-inset-bottom, 0px), 28px);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 0;
 }
 
 .settings-scroll::-webkit-scrollbar {
@@ -4425,31 +4429,30 @@ body,
 
 .settings-profile-card {
   width: 100%;
-  padding: 12px 14px;
-  border-radius: 20px;
-  border: 1px solid rgba(96, 165, 250, 0.24);
-  background: rgba(14, 29, 64, 0.76);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  padding: 14px 18px;
+  border: none;
+  border-bottom: 1px solid rgba(96, 165, 250, 0.14);
+  border-radius: 0;
+  background: transparent;
   display: flex;
   align-items: center;
   gap: 12px;
   text-align: left;
   cursor: pointer;
   color: #ffffff;
-  transition: transform 0.14s ease, border-color 0.14s ease;
+  transition: background-color 0.14s ease;
 }
 
 .settings-profile-card:active {
-  transform: scale(0.99);
+  background: rgba(59, 130, 246, 0.1);
 }
 
 .settings-profile-avatar {
-  width: 48px;
-  height: 48px;
+  width: 50px;
+  height: 50px;
   border-radius: 9999px;
   object-fit: cover;
-  border: 2px solid rgba(96, 165, 250, 0.55);
+  border: 1.5px solid rgba(96, 165, 250, 0.5);
   flex-shrink: 0;
 }
 
@@ -4486,22 +4489,24 @@ body,
 }
 
 .settings-pro-banner {
-  padding: 15px 14px;
-  border-radius: 22px;
-  border: 1px solid rgba(59, 130, 246, 0.42);
-  background: linear-gradient(135deg, #0b1c47 0%, #091330 60%, #102a68 100%);
-  box-shadow: 0 12px 26px rgba(10, 30, 90, 0.45);
+  width: 100%;
+  padding: 16px 18px;
+  border: none;
+  border-bottom: 1px solid rgba(96, 165, 250, 0.14);
+  border-radius: 0;
+  background: linear-gradient(90deg, rgba(26, 102, 255, 0.14) 0%, rgba(5, 10, 24, 0) 100%);
+  box-shadow: none;
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
 .settings-pro-sparkle {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  background: rgba(26, 102, 255, 0.18);
-  border: 1px solid rgba(96, 165, 250, 0.35);
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4522,7 +4527,7 @@ body,
 
 .settings-pro-desc {
   margin-top: 2px;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.35;
   color: rgba(226, 232, 240, 0.72);
 }
@@ -4531,8 +4536,8 @@ body,
   height: 34px;
   padding: 0 11px 0 13px;
   border-radius: 9999px;
-  border: 1px solid rgba(96, 165, 250, 0.48);
-  background: linear-gradient(180deg, rgba(37, 99, 235, 0.65) 0%, rgba(29, 78, 216, 0.82) 100%);
+  border: none;
+  background: #1a66ff;
   color: #ffffff;
   font-family: inherit;
   font-size: 12.5px;
@@ -4545,12 +4550,14 @@ body,
 }
 
 .settings-card-group {
-  border-radius: 22px;
-  border: 1px solid rgba(96, 165, 250, 0.18);
-  background: rgba(12, 25, 56, 0.78);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  overflow: hidden;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid rgba(96, 165, 250, 0.14);
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  overflow: visible;
   display: flex;
   flex-direction: column;
 }
@@ -4558,9 +4565,9 @@ body,
 .settings-row {
   width: 100%;
   min-height: 54px;
-  padding: 12px 14px;
+  padding: 12px 18px;
   border: none;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
   background: transparent;
   color: #f1f5f9;
   font-family: inherit;
@@ -4579,7 +4586,7 @@ body,
 }
 
 .settings-row:active {
-  background: rgba(59, 130, 246, 0.14);
+  background: rgba(59, 130, 246, 0.12);
 }
 
 .settings-row-icon {
@@ -5126,7 +5133,8 @@ body,
    Real User Profile & Empty Posts
 ================================ */
 .profile-name-row {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
   align-items: center;
   justify-content: center;
   gap: 8px;
@@ -5160,13 +5168,13 @@ body,
 }
 
 .profile-empty-state {
-  margin-top: 4px;
-  padding: 24px 18px;
-  border-radius: 22px;
-  border: 1px solid rgba(96, 165, 250, 0.22);
-  background: rgba(11, 23, 52, 0.72);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  margin-top: 20px;
+  padding: 18px 8px 32px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   text-align: center;
   display: flex;
   flex-direction: column;
