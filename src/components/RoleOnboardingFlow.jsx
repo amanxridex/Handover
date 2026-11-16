@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import handoverWordmark from '../assets/logos/handover-wordmark.png';
+import { compressImageFile } from '../utils/imageCompress';
 import { triggerLightHaptic } from '../utils/nativeBridge';
 import { BackTriangleIcon } from './Icons';
 
@@ -97,6 +98,10 @@ export default function RoleOnboardingFlow({
 
   // Founder state
   const [companyName, setCompanyName] = useState(initialData?.companyName || '');
+  const [companyLogoUrl, setCompanyLogoUrl] = useState(
+    initialData?.companyLogoUrl || ''
+  );
+  const logoInputRef = useRef(null);
   const [hasWebsite, setHasWebsite] = useState(
     initialData?.hasWebsite !== undefined ? initialData.hasWebsite : null
   ); // true | false | null
@@ -134,6 +139,7 @@ export default function RoleOnboardingFlow({
   const buildDraft = (overrides = {}) => ({
     role,
     companyName,
+    companyLogoUrl,
     hasWebsite,
     websiteUrl,
     founderInstagram,
@@ -175,6 +181,18 @@ export default function RoleOnboardingFlow({
       onSaveDraft(buildDraft());
     }
     onSubStepChange(role === 'founder' ? 'founder-1' : 'creator-1');
+  };
+
+  const handleCompanyLogoPick = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    triggerLightHaptic();
+    const compressed = await compressImageFile(file, 256, 0.86);
+    if (compressed) {
+      setCompanyLogoUrl(compressed);
+      setErrorMsg('');
+    }
+    e.target.value = '';
   };
 
   const handleFounderStep1Next = (e) => {
@@ -226,6 +244,7 @@ export default function RoleOnboardingFlow({
       ...draft,
       role: 'founder',
       companyName: companyName.trim(),
+      companyLogoUrl,
       hasWebsite,
       websiteUrl: hasWebsite ? websiteUrl.trim() : '',
       instagram: !hasWebsite ? founderInstagram.trim() : '',
@@ -422,6 +441,87 @@ export default function RoleOnboardingFlow({
                     setErrorMsg('');
                   }}
                 />
+              </div>
+
+              <div className="setup-field-group">
+                <span className="setup-label">Company logo</span>
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="visually-hidden-file"
+                  onChange={handleCompanyLogoPick}
+                />
+                <div className="setup-logo-row">
+                  <button
+                    type="button"
+                    className="setup-logo-btn"
+                    onClick={() => {
+                      triggerLightHaptic();
+                      logoInputRef.current?.click();
+                    }}
+                  >
+                    {companyLogoUrl ? (
+                      <img
+                        src={companyLogoUrl}
+                        alt={companyName || 'Company logo'}
+                        className="setup-logo-thumb"
+                      />
+                    ) : (
+                      <span className="setup-logo-placeholder" aria-hidden="true">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M12 5V19M5 12H19"
+                            stroke="currentColor"
+                            strokeWidth="2.1"
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </span>
+                    )}
+                    <div className="setup-logo-copy">
+                      <span className="setup-logo-title">
+                        {companyLogoUrl ? 'Change company logo' : 'Upload company logo'}
+                      </span>
+                      <span className="setup-logo-sub">
+                        Shown beside your name on posts as a Founder badge
+                      </span>
+                    </div>
+                  </button>
+                  {companyLogoUrl && (
+                    <button
+                      type="button"
+                      className="setup-logo-remove"
+                      onClick={() => {
+                        triggerLightHaptic();
+                        setCompanyLogoUrl('');
+                      }}
+                      aria-label="Remove company logo"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+
+                {(companyName.trim() || companyLogoUrl) && (
+                  <div className="setup-logo-preview-pill">
+                    <span className="setup-logo-preview-label">Post badge preview:</span>
+                    <span className="setup-logo-preview-user">
+                      {userName || 'Your Name'}
+                    </span>
+                    {companyLogoUrl ? (
+                      <img
+                        src={companyLogoUrl}
+                        alt={companyName || 'Company badge'}
+                        className="feed-founder-badge"
+                      />
+                    ) : (
+                      <span className="feed-founder-monogram" aria-hidden="true">
+                        {companyName.trim().charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="setup-field-group">

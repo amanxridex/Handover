@@ -154,3 +154,4 @@ drop policy if exists "Notifications can be updated" on public.notifications;
 create policy "Notifications can be updated"
   on public.notifications for update
   using (true);
+

@@ -117,15 +117,74 @@ const TABS = [
   { id: 'profile', label: 'Profile', Icon: ProfileTabIcon },
 ];
 
+function routeForSnapshot(snap) {
+  if (!snap || snap.flowStep === 'onboarding') return '/onboarding';
+  if (snap.flowStep === 'setup') return '/onboarding/profile';
+  if (snap.flowStep === 'role') {
+    if (snap.roleSubStep === 'founder-1') return '/onboarding/founder';
+    if (snap.roleSubStep === 'founder-2') return '/onboarding/founder/details';
+    if (snap.roleSubStep === 'creator-1') return '/onboarding/creator';
+    return '/onboarding/role';
+  }
+  if (snap.activeTab === 'home') {
+    return snap.notificationsOpen ? '/notifications' : '/home';
+  }
+  if (snap.activeTab === 'chat') {
+    return snap.activeChatId ? `/chat/${snap.activeChatId}` : '/chat';
+  }
+  if (snap.activeTab === 'search') return '/search';
+  if (snap.activeTab === 'profile') return '/profile';
+  return '/home';
+}
+
+function snapshotFromPathname(pathname, alreadyOnboarded) {
+  const path = (pathname || '/').replace(/\/+$/, '') || '/';
+  const base = {
+    flowStep: alreadyOnboarded ? 'main' : 'onboarding',
+    roleSubStep: 'role',
+    activeTab: 'home',
+    offerOpen: false,
+    hasPostModal: false,
+    activeChatId: null,
+    notificationsOpen: false,
+  };
+  if (!alreadyOnboarded) {
+    if (path === '/onboarding/profile') return { ...base, flowStep: 'setup' };
+    if (path === '/onboarding/role') return { ...base, flowStep: 'role', roleSubStep: 'role' };
+    if (path === '/onboarding/founder') return { ...base, flowStep: 'role', roleSubStep: 'founder-1' };
+    if (path === '/onboarding/founder/details') return { ...base, flowStep: 'role', roleSubStep: 'founder-2' };
+    if (path === '/onboarding/creator') return { ...base, flowStep: 'role', roleSubStep: 'creator-1' };
+    return base;
+  }
+  if (path === '/notifications') {
+    return { ...base, flowStep: 'main', activeTab: 'home', notificationsOpen: true };
+  }
+  if (path === '/chat') return { ...base, flowStep: 'main', activeTab: 'chat' };
+  if (path.startsWith('/chat/')) {
+    return {
+      ...base,
+      flowStep: 'main',
+      activeTab: 'chat',
+      activeChatId: path.slice('/chat/'.length) || null,
+    };
+  }
+  if (path === '/search') return { ...base, flowStep: 'main', activeTab: 'search' };
+  if (path === '/profile') return { ...base, flowStep: 'main', activeTab: 'profile' };
+  return { ...base, flowStep: 'main', activeTab: 'home' };
+}
+
 export default function App() {
   const initialStored = useMemo(() => getStoredOnboardingState(), []);
   const alreadyOnboarded = Boolean(initialStored);
+  const initialRouteSnap = useMemo(
+    () => snapshotFromPathname(window.location.pathname, alreadyOnboarded),
+    [alreadyOnboarded]
+  );
 
   const [showSplash, setShowSplash] = useState(true);
-  const [flowStep, setFlowStep] = useState(
-    alreadyOnboarded ? 'main' : 'onboarding'
-  ); // onboarding | setup | role | main
-  const [roleSubStep, setRoleSubStep] = useState('role'); // role | founder-1 | founder-2 | creator-1
+  const [profileId, setProfileId] = useState(initialStored?.id || null);
+  const [flowStep, setFlowStep] = useState(initialRouteSnap.flowStep); // onboarding | setup | role | main
+  const [roleSubStep, setRoleSubStep] = useState(initialRouteSnap.roleSubStep); // role | founder-1 | founder-2 | creator-1
   const [setupData, setSetupData] = useState(
     initialStored?.setupData || {
       name: '',
@@ -137,7 +196,7 @@ export default function App() {
     initialStored?.roleDetails || null
   );
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState(initialRouteSnap.activeTab);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState(
     initialStored?.setupData?.name
@@ -146,8 +205,10 @@ export default function App() {
   );
   const [offerOpen, setOfferOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
-  const [activeChatId, setActiveChatId] = useState(null);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [activeChatId, setActiveChatId] = useState(initialRouteSnap.activeChatId);
+  const [notificationsOpen, setNotificationsOpen] = useState(
+    initialRouteSnap.notificationsOpen
+  );
   const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
   const [exitHint, setExitHint] = useState(false);
 
@@ -187,22 +248,17 @@ export default function App() {
 
   // Initialize browser history sentinel + root entry and sync profile with Supabase
   useEffect(() => {
-    const initial = {
-      flowStep: alreadyOnboarded ? 'main' : 'onboarding',
-      roleSubStep: 'role',
-      activeTab: 'home',
-      offerOpen: false,
-      hasPostModal: false,
-      activeChatId: null,
-      notificationsOpen: false,
-    };
-    window.history.replaceState({ handoverSentinel: true }, '');
-    window.history.pushState({ handoverNav: initial }, '');
+    const initialPath = routeForSnapshot(initialRouteSnap);
+    window.history.replaceState({ handoverSentinel: true }, '', initialPath);
+    window.history.pushState({ handoverNav: initialRouteSnap }, '', initialPath);
     historyReadyRef.current = true;
 
     if (initialStored) {
       syncProfileFromSupabase(initialStored).then((synced) => {
         if (!synced) return;
+        if (synced.id) {
+          setProfileId(synced.id);
+        }
         setSetupData((prev) => ({
           ...prev,
           ...synced.setupData,
@@ -220,7 +276,7 @@ export default function App() {
     return () => {
       if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
     };
-  }, [alreadyOnboarded, initialStored]);
+  }, [initialRouteSnap, initialStored]);
 
   // Push history entry whenever user navigates forward in-app
   useEffect(() => {
@@ -232,7 +288,11 @@ export default function App() {
     }
     if (prevNavKeyRef.current !== navKey) {
       prevNavKeyRef.current = navKey;
-      window.history.pushState({ handoverNav: navSnapshot }, '');
+      window.history.pushState(
+        { handoverNav: navSnapshot },
+        '',
+        routeForSnapshot(navSnapshot)
+      );
     }
   }, [navKey, navSnapshot]);
 
@@ -246,7 +306,7 @@ export default function App() {
         const target = state.handoverNav;
         setFlowStep(target.flowStep);
         setRoleSubStep(target.roleSubStep || 'role');
-        setActiveTab(target.activeTab || 'brands');
+        setActiveTab(target.activeTab || 'home');
         setOfferOpen(Boolean(target.offerOpen));
         if (!target.hasPostModal) {
           setSelectedPost(null);
@@ -266,23 +326,33 @@ export default function App() {
       if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
       exitTimerRef.current = setTimeout(() => setExitHint(false), 1800);
 
+      const fallbackSnap = {
+        flowStep,
+        roleSubStep,
+        activeTab,
+        offerOpen,
+        hasPostModal: Boolean(selectedPost),
+        activeChatId,
+        notificationsOpen,
+      };
       window.history.pushState(
-        {
-          handoverNav: {
-            flowStep,
-            roleSubStep,
-            activeTab,
-            offerOpen,
-            hasPostModal: Boolean(selectedPost),
-          },
-        },
-        ''
+        { handoverNav: fallbackSnap },
+        '',
+        routeForSnapshot(fallbackSnap)
       );
     };
 
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, [flowStep, roleSubStep, activeTab, offerOpen, selectedPost]);
+  }, [
+    flowStep,
+    roleSubStep,
+    activeTab,
+    offerOpen,
+    selectedPost,
+    activeChatId,
+    notificationsOpen,
+  ]);
 
   const activePromo = PROMO_BY_CATEGORY[selectedCategory] || PROMO_BY_CATEGORY.All;
 
@@ -358,14 +428,14 @@ export default function App() {
     };
     isPoppingRef.current = true;
     prevNavKeyRef.current = JSON.stringify(resetRoot);
-    window.history.replaceState({ handoverSentinel: true }, '');
-    window.history.pushState({ handoverNav: resetRoot }, '');
+    window.history.replaceState({ handoverSentinel: true }, '', '/onboarding');
+    window.history.pushState({ handoverNav: resetRoot }, '', '/onboarding');
+    setProfileId(null);
     setFlowStep('onboarding');
   };
 
-  const handleRoleComplete = (details) => {
+  const handleRoleComplete = async (details) => {
     setRoleDetails(details);
-    saveOnboardedProfile({ setupData, roleDetails: details });
 
     // Set Home Feed as the new root history entry once onboarding is complete
     const mainRoot = {
@@ -379,11 +449,16 @@ export default function App() {
     };
     isPoppingRef.current = true;
     prevNavKeyRef.current = JSON.stringify(mainRoot);
-    window.history.replaceState({ handoverSentinel: true }, '');
-    window.history.pushState({ handoverNav: mainRoot }, '');
+    window.history.replaceState({ handoverSentinel: true }, '', '/home');
+    window.history.pushState({ handoverNav: mainRoot }, '', '/home');
 
     setActiveTab('home');
     setFlowStep('main');
+
+    const saved = await saveOnboardedProfile({ setupData, roleDetails: details });
+    if (saved?.id) {
+      setProfileId(saved.id);
+    }
   };
 
   return (
@@ -457,9 +532,13 @@ export default function App() {
         ) : activeTab === 'home' ? (
           <HomeFeedScreen
             currentUser={{
+              id: profileId,
               name: selectedUser.name,
               username: setupData.username,
               avatar: setupData.avatar,
+              role: roleDetails?.role || '',
+              companyName: roleDetails?.companyName || '',
+              companyLogoUrl: roleDetails?.companyLogoUrl || '',
             }}
             unreadNotifications={unreadNotifications}
             onOpenNotifications={() => setNotificationsOpen(true)}

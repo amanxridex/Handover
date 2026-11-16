@@ -3559,3 +3559,144 @@ body,
   font-weight: 600;
   cursor: pointer;
 }
+
+/* ================================
+   Founder Company Logo & Post Badge
+================================ */
+.setup-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setup-logo-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1.5px dashed #cbd5e1;
+  background: rgba(248, 250, 252, 0.9);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.setup-logo-btn:active {
+  transform: scale(0.99);
+}
+
+.setup-logo-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+.setup-logo-placeholder {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(26, 102, 255, 0.08);
+  border: 1px solid rgba(26, 102, 255, 0.22);
+  color: #1a66ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.setup-logo-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.setup-logo-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.setup-logo-sub {
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: #64748b;
+}
+
+.setup-logo-remove {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.setup-logo-preview-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 6px 11px;
+  border-radius: 9999px;
+  background: #0b1630;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.setup-logo-preview-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.setup-logo-preview-user {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.feed-author-name-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.feed-founder-badge {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+.feed-founder-monogram {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #1a66ff 0%, #0ea5e9 100%);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import avatarDefault from '../assets/avatar-default.jpg';
 import avatarJacob from '../assets/avatar-jacob.jpg';
 import creation3 from '../assets/creation-3.jpg';
@@ -6,8 +6,16 @@ import creation5 from '../assets/creation-5.jpg';
 import creation6 from '../assets/creation-6.jpg';
 import feedPillowFight from '../assets/feed-pillow-fight.jpg';
 import feedWarmPost from '../assets/feed-warm-post.jpg';
+import handoverMarkBlue from '../assets/logos/handover-mark-blue.jpg';
 import handoverMark from '../assets/logos/handover-mark.png';
 import profileHero from '../assets/profile-hero.jpg';
+import {
+  createFeedPost,
+  fetchFeedPosts,
+  savePostComment,
+  updatePostLikes,
+} from '../services/feedService';
+import { compressImageFile } from '../utils/imageCompress';
 import { triggerLightHaptic } from '../utils/nativeBridge';
 import {
   BellIcon,
@@ -38,29 +46,44 @@ const STORY_CAPSULES = [
 const INITIAL_POSTS = [
   {
     id: 'pillow-fight',
-    author: '@Maria Theodor',
+    authorName: 'Maria Theodor',
+    authorHandle: '@mariatheodor',
+    authorRole: 'creator',
+    companyName: '',
+    companyLogoUrl: '',
     time: '6h ago',
     avatar: creation5,
     headline: 'Check out my pillow fight with beautiful views',
     image: feedPillowFight,
+    likesCount: 24,
     liked: false,
   },
   {
     id: 'skyline-sunset',
-    author: '@Olivia Beits',
+    authorName: 'Olivia Beits',
+    authorHandle: '@oliviabeits',
+    authorRole: 'creator',
+    companyName: '',
+    companyLogoUrl: '',
     time: '9h ago',
     avatar: profileHero,
     headline: 'Golden hour above the skyline with my favourite crew',
     image: feedWarmPost,
+    likesCount: 18,
     liked: false,
   },
   {
     id: 'courtside-dusk',
-    author: '@Jacob Jones',
+    authorName: 'Jacob Jones',
+    authorHandle: '@jacobjones',
+    authorRole: 'founder',
+    companyName: 'Handover',
+    companyLogoUrl: handoverMarkBlue,
     time: '1d ago',
     avatar: avatarJacob,
     headline: 'Courtside dusk sessions & twilight match point',
     image: creation3,
+    likesCount: 41,
     liked: false,
   },
 ];
@@ -87,6 +110,22 @@ export default function HomeFeedScreen({
   const [newHeadline, setNewHeadline] = useState('');
   const [newImage, setNewImage] = useState('');
 
+  // Load live feed posts from Supabase
+  useEffect(() => {
+    let active = true;
+    fetchFeedPosts().then((remotePosts) => {
+      if (!active || !remotePosts || remotePosts.length === 0) return;
+      setPosts((prev) => {
+        const remoteIds = new Set(remotePosts.map((p) => p.id));
+        const remainingLocal = prev.filter((p) => !remoteIds.has(p.id));
+        return [...remotePosts, ...remainingLocal];
+      });
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const showNotice = (msg) => {
     setPostedNotice(msg);
     setTimeout(() => setPostedNotice(''), 1800);
@@ -94,33 +133,46 @@ export default function HomeFeedScreen({
 
   const toggleLike = (postId) => {
     triggerLightHaptic();
+    let updatedCount = null;
     setPosts((prev) =>
-      prev.map((p) => (p.id === postId ? { ...p, liked: !p.liked } : p))
+      prev.map((p) => {
+        if (p.id !== postId) return p;
+        const nextLiked = !p.liked;
+        updatedCount = Math.max(0, (p.likesCount || 0) + (nextLiked ? 1 : -1));
+        return { ...p, liked: nextLiked, likesCount: updatedCount };
+      })
     );
+    if (updatedCount !== null) {
+      updatePostLikes(postId, updatedCount);
+    }
   };
 
-  const handleCommentSubmit = (e, postId) => {
+  const handleCommentSubmit = async (e, postId) => {
     e.preventDefault();
     const text = (commentDrafts[postId] || '').trim();
     if (!text) return;
     triggerLightHaptic();
     setCommentDrafts((prev) => ({ ...prev, [postId]: '' }));
     showNotice('Comment added');
+    await savePostComment({
+      postId,
+      authorId: currentUser?.id || null,
+      authorName: currentUser?.name || currentUser?.username || 'You',
+      body: text,
+    });
   };
 
-  const handlePostPhotoChange = (e) => {
+  const handlePostPhotoChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setNewImage(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
+    const compressed = await compressImageFile(file, 900, 0.82);
+    if (compressed) {
+      setNewImage(compressed);
+    }
+    e.target.value = '';
   };
 
-  const handlePublishPost = (e) => {
+  const handlePublishPost = async (e) => {
     e.preventDefault();
     const headline = newHeadline.trim();
     if (!headline) {
@@ -128,25 +180,53 @@ export default function HomeFeedScreen({
       return;
     }
     triggerLightHaptic();
-    const handle = currentUser?.username
-      ? `@${currentUser.username}`
-      : currentUser?.name
-        ? `@${currentUser.name}`
-        : '@you';
-    const created = {
-      id: `post-${Date.now()}`,
-      author: handle,
+    const displayName =
+      currentUser?.name?.trim() ||
+      currentUser?.username?.trim() ||
+      'Handover Member';
+    const rawUsername = currentUser?.username?.trim() || '';
+    const handle = rawUsername
+      ? `@${rawUsername}`
+      : `@${displayName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'you'}`;
+    const optimisticId = `post-${Date.now()}`;
+    const draftPost = {
+      id: optimisticId,
+      authorName: displayName,
+      authorHandle: handle,
+      authorRole: currentUser?.role || 'creator',
+      companyName: currentUser?.companyName || '',
+      companyLogoUrl: currentUser?.companyLogoUrl || '',
       time: 'Just now',
       avatar: currentUser?.avatar || avatarDefault,
       headline,
       image: newImage || feedWarmPost,
+      likesCount: 0,
       liked: false,
     };
-    setPosts((prev) => [created, ...prev]);
+    setPosts((prev) => [draftPost, ...prev]);
     setNewHeadline('');
     setNewImage('');
     setCreateOpen(false);
     showNotice('Post published!');
+
+    const saved = await createFeedPost({
+      authorId: currentUser?.id || null,
+      authorName: draftPost.authorName,
+      authorHandle: draftPost.authorHandle,
+      avatar: draftPost.avatar,
+      authorRole: draftPost.authorRole,
+      companyName: draftPost.companyName,
+      companyLogoUrl: draftPost.companyLogoUrl,
+      headline: draftPost.headline,
+      image: draftPost.image,
+      likesCount: 0,
+      liked: false,
+    });
+    if (saved?.id) {
+      setPosts((prev) =>
+        prev.map((p) => (p.id === optimisticId ? { ...p, id: saved.id } : p))
+      );
+    }
   };
 
   return (
@@ -279,12 +359,40 @@ export default function HomeFeedScreen({
                 >
                   <img
                     src={post.avatar}
-                    alt={post.author}
+                    alt={post.authorName || post.author || 'Author'}
                     className="feed-author-avatar"
                   />
                   <div className="feed-author-meta">
-                    <span className="feed-author-name">{post.author}</span>
-                    <span className="feed-author-time">{post.time}</span>
+                    <span className="feed-author-name-row">
+                      <span className="feed-author-name">
+                        {post.authorName || post.author}
+                      </span>
+                      {post.authorRole === 'founder' &&
+                        (post.companyLogoUrl ? (
+                          <img
+                            src={post.companyLogoUrl}
+                            alt={post.companyName || 'Company badge'}
+                            title={
+                              post.companyName
+                                ? `Founder of ${post.companyName}`
+                                : 'Founder'
+                            }
+                            className="feed-founder-badge"
+                          />
+                        ) : post.companyName ? (
+                          <span
+                            className="feed-founder-monogram"
+                            title={`Founder of ${post.companyName}`}
+                            aria-label={`Founder of ${post.companyName}`}
+                          >
+                            {post.companyName.trim().charAt(0).toUpperCase()}
+                          </span>
+                        ) : null)}
+                    </span>
+                    <span className="feed-author-time">
+                      {post.authorHandle ? `${post.authorHandle} · ` : ''}
+                      {post.time}
+                    </span>
                   </div>
                 </button>
 

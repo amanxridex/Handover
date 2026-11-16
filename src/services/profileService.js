@@ -109,7 +109,6 @@ export async function saveOnboardedProfile({ setupData, roleDetails }) {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(profileRecord));
   } catch {
-    // Ignore quota errors (e.g. very large custom base64 avatar)
     try {
       window.localStorage.setItem(
         STORAGE_KEY,
@@ -135,6 +134,10 @@ export async function saveOnboardedProfile({ setupData, roleDetails }) {
       role: roleDetails.role,
       company_name:
         roleDetails.role === 'founder' ? roleDetails.companyName : null,
+      company_logo_url:
+        roleDetails.role === 'founder'
+          ? roleDetails.companyLogoUrl || null
+          : null,
       has_website:
         roleDetails.role === 'founder' ? Boolean(roleDetails.hasWebsite) : null,
       website_url:
@@ -196,6 +199,8 @@ export async function syncProfileFromSupabase(stored) {
           ? {
               role: 'founder',
               companyName: data.company_name || '',
+              companyLogoUrl:
+                data.company_logo_url || stored.roleDetails?.companyLogoUrl || '',
               hasWebsite: Boolean(data.has_website),
               websiteUrl: data.website_url || '',
               instagram: data.instagram_handle || '',
