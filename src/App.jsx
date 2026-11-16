@@ -17,6 +17,7 @@ import {
   USER_PROFILES,
 } from './data/brandsData';
 import OnboardingScreen from './components/OnboardingScreen';
+import HomeFeedScreen from './components/HomeFeedScreen';
 import ProfileScreen from './components/ProfileScreen';
 import ProfileSetupScreen from './components/ProfileSetupScreen';
 import RoleOnboardingFlow from './components/RoleOnboardingFlow';
@@ -216,7 +217,7 @@ export default function App() {
 
   const handleRoleComplete = (details) => {
     setRoleDetails(details);
-    setActiveTab('brands');
+    setActiveTab('home');
     setFlowStep('main');
   };
 
@@ -260,6 +261,14 @@ export default function App() {
             selectedPost={selectedPost}
             onSelectPost={setSelectedPost}
             onClosePost={goBackInHistory}
+          />
+        ) : activeTab === 'home' ? (
+          <HomeFeedScreen
+            onOpenSearch={() => handleTabSelect('search')}
+            onOpenProfile={() => handleTabSelect('profile')}
+            tabs={TABS}
+            activeTab={activeTab}
+            onSelectTab={handleTabSelect}
           />
         ) : (
           <>

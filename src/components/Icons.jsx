@@ -42,8 +42,8 @@ export function SearchIcon() {
   );
 }
 
-export function HomeTabIcon({ active }) {
-  const color = active ? '#E11D48' : '#111827';
+export function HomeTabIcon({ active, dark = false }) {
+  const color = active ? (dark ? '#FFFFFF' : '#E11D48') : dark ? 'rgba(255,255,255,0.62)' : '#111827';
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
@@ -54,14 +54,14 @@ export function HomeTabIcon({ active }) {
   );
 }
 
-export function BrandsTabIcon({ active }) {
-  const color = active ? '#E11D48' : '#111827';
+export function BrandsTabIcon({ active, dark = false }) {
+  const color = active ? (dark ? '#FFFFFF' : '#E11D48') : dark ? 'rgba(255,255,255,0.62)' : '#111827';
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <rect x="4" y="4.5" width="16" height="15" rx="3.4" fill={color} />
       <path
         d="M8.7 9.4C8.7 11.22 10.18 12.7 12 12.7C13.82 12.7 15.3 11.22 15.3 9.4"
-        stroke="#FFFFFF"
+        stroke={dark ? '#18181D' : '#FFFFFF'}
         strokeWidth="1.9"
         strokeLinecap="round"
       />
@@ -69,8 +69,8 @@ export function BrandsTabIcon({ active }) {
   );
 }
 
-export function SearchTabIcon({ active }) {
-  const color = active ? '#E11D48' : '#111827';
+export function SearchTabIcon({ active, dark = false }) {
+  const color = active ? (dark ? '#FFFFFF' : '#E11D48') : dark ? 'rgba(255,255,255,0.62)' : '#111827';
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle cx="10.5" cy="10.5" r="6" stroke={color} strokeWidth="2.3" />
@@ -84,8 +84,8 @@ export function SearchTabIcon({ active }) {
   );
 }
 
-export function ProfileTabIcon({ active }) {
-  const color = active ? '#E11D48' : '#111827';
+export function ProfileTabIcon({ active, dark = false }) {
+  const color = active ? (dark ? '#FFFFFF' : '#E11D48') : dark ? 'rgba(255,255,255,0.62)' : '#111827';
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle cx="12" cy="12" r="8.6" stroke={color} strokeWidth="2.1" />
@@ -137,3 +137,76 @@ export function MessageBubbleIcon() {
   );
 }
 
+
+export function BellIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M18 8.5C18 5.46 15.31 3 12 3C8.69 3 6 5.46 6 8.5C6 14.2 3.5 16 3.5 16H20.5C20.5 16 18 14.2 18 8.5Z"
+        stroke="#FFFFFF"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10.1 19.2C10.5 19.95 11.2 20.4 12 20.4C12.8 20.4 13.5 19.95 13.9 19.2"
+        stroke="#FFFFFF"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function PlusIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path
+        d="M9 3.5V14.5M3.5 9H14.5"
+        stroke="#FFFFFF"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function ChevronDownIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path
+        d="M3.5 5.2L7 8.8L10.5 5.2"
+        stroke="rgba(255,255,255,0.8)"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function CommentBubbleIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 4C7.03 4 3 7.36 3 11.5C3 13.35 3.81 15.05 5.15 16.36L4.35 19.65L7.95 18.25C9.19 18.73 10.56 19 12 19C16.97 19 21 15.64 21 11.5C21 7.36 16.97 4 12 4Z"
+        stroke="rgba(255,255,255,0.88)"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function HeartIcon({ filled }) {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 20.2C12 20.2 4 14.9 4 9.2C4 6.5 6.1 4.5 8.6 4.5C10.1 4.5 11.4 5.2 12 6.3C12.6 5.2 13.9 4.5 15.4 4.5C17.9 4.5 20 6.5 20 9.2C20 14.9 12 20.2 12 20.2Z"
+        fill={filled ? '#EF233C' : 'none'}
+        stroke={filled ? '#EF233C' : 'rgba(255,255,255,0.9)'}
+        strokeWidth="1.9"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
