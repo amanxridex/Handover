@@ -465,3 +465,4 @@ grant execute on function public.update_authenticated_profile(text, text, text, 
 grant execute on function public.get_authenticated_settings(text) to anon, authenticated;
 grant execute on function public.save_authenticated_settings(text, text, boolean, boolean, text, boolean, boolean, boolean, boolean, boolean, boolean, text) to anon, authenticated;
 grant execute on function public.verify_authenticated_passcode(text, text) to anon, authenticated;
+

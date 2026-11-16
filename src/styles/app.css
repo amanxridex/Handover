@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --sky-top: #0377e7;
   --sky-upper: #158bf0;
   --sky-mid: #4eb0fa;
@@ -5119,4 +5119,99 @@ body,
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+}
+
+
+/* ================================
+   Real User Profile & Empty Posts
+================================ */
+.profile-name-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.profile-founder-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.38);
+  background: #ffffff;
+  flex-shrink: 0;
+}
+
+.profile-founder-monogram {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #1a66ff 0%, #0ea5e9 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.38);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.profile-empty-state {
+  margin-top: 4px;
+  padding: 24px 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  background: rgba(11, 23, 52, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-empty-title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.profile-empty-sub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.profile-empty-cta {
+  margin-top: 6px;
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 9999px;
+  border: none;
+  background: #1a66ff;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.profile-text-post-tile {
+  width: 100%;
+  height: 100%;
+  padding: 14px;
+  background: linear-gradient(145deg, #0f2557 0%, #07122b 100%);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  display: flex;
+  align-items: flex-end;
+  text-align: left;
 }

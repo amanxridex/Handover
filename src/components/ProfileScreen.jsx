@@ -1,63 +1,13 @@
-import React, { useState } from 'react';
-import creationLeft from '../assets/creation-left.jpg';
-import creationRight from '../assets/creation-right.jpg';
-import creation3 from '../assets/creation-3.jpg';
-import creation4 from '../assets/creation-4.jpg';
-import creation5 from '../assets/creation-5.jpg';
-import creation6 from '../assets/creation-6.jpg';
-import profileHero from '../assets/profile-hero.jpg';
+import React, { useEffect, useState } from 'react';
+import avatarDefault from '../assets/avatar-default.jpg';
+import { fetchUserProfileOverview } from '../services/feedService';
 import { triggerLightHaptic } from '../utils/nativeBridge';
-import { CloseXIcon, MessageBubbleIcon, MoreDotsIcon } from './Icons';
-
-const FEATURED_POSTS = [
-  {
-    id: 'court-heels',
-    image: creationLeft,
-    alt: 'Editorial tennis court footwear creation',
-    title: 'Court Heels · Drop 04',
-    tag: 'Footwear',
-  },
-  {
-    id: 'jersey-twelve',
-    image: creationRight,
-    alt: 'Editorial tennis court apparel creation',
-    title: 'Varsity 12 · Twilight',
-    tag: 'Apparel',
-  },
-];
-
-const MORE_POSTS = [
-  {
-    id: 'bench-racket',
-    image: creation3,
-    alt: 'Model seated on green court bench holding vintage tennis racket',
-    title: 'Courtside Dusk',
-    tag: 'Editorial',
-  },
-  {
-    id: 'still-life',
-    image: creation4,
-    alt: 'Retro tennis sneakers, cherry-red bag and tennis balls on green court',
-    title: 'Match Point Kit',
-    tag: 'Objects',
-  },
-  {
-    id: 'coastal-profile',
-    image: creation5,
-    alt: 'Coastal cliffside sunlight editorial portrait with palm fronds',
-    title: 'Mediterranean Blue',
-    tag: 'Campaign',
-  },
-  {
-    id: 'fence-walk',
-    image: creation6,
-    alt: 'Model walking past tennis court chain-link fence at dusk',
-    title: 'Baseline Motion',
-    tag: 'Lookbook',
-  },
-];
+import { CloseXIcon, MoreDotsIcon } from './Icons';
 
 export default function ProfileScreen({
+  currentUser,
+  roleDetails,
+  showBadges = true,
   onClose,
   selectedPost,
   onSelectPost,
@@ -66,19 +16,67 @@ export default function ProfileScreen({
   onOpenSettings,
   onLogout,
 }) {
-  const [isFollowing, setIsFollowing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [messageToast, setMessageToast] = useState(false);
+  const [toastMsg, setToastMsg] = useState('');
+  const [loadingOverview, setLoadingOverview] = useState(true);
+  const [overview, setOverview] = useState({
+    posts: [],
+    followersCount: 0,
+    followingCount: 0,
+    postsCount: 0,
+  });
 
-  const handleFollow = () => {
-    triggerLightHaptic();
-    setIsFollowing((prev) => !prev);
+  const displayName = currentUser?.name?.trim() || 'Handover Member';
+  const username = currentUser?.username?.trim() || 'member';
+  const avatarSrc = currentUser?.avatar || avatarDefault;
+  const isFounder = roleDetails?.role === 'founder';
+
+  const bioText =
+    currentUser?.bio?.trim() ||
+    (isFounder
+      ? [
+          roleDetails?.companyName
+            ? `Founder of ${roleDetails.companyName}`
+            : 'Founder',
+          roleDetails?.sector,
+          roleDetails?.companyPitch,
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : Array.isArray(roleDetails?.contentTypes) &&
+          roleDetails.contentTypes.length > 0
+        ? `Creator · ${roleDetails.contentTypes.join(', ')}`
+        : '');
+
+  useEffect(() => {
+    let active = true;
+    setLoadingOverview(true);
+    fetchUserProfileOverview(currentUser?.id).then((data) => {
+      if (!active) return;
+      setOverview(data);
+      setLoadingOverview(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [currentUser?.id]);
+
+  const showToast = (msg) => {
+    setToastMsg(msg);
+    setTimeout(() => setToastMsg(''), 1800);
   };
 
-  const handleMessage = () => {
+  const handleCopyHandle = async () => {
     triggerLightHaptic();
-    setMessageToast(true);
-    setTimeout(() => setMessageToast(false), 1800);
+    const handle = `@${username}`;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(handle);
+      }
+      showToast(`Copied ${handle}`);
+    } catch {
+      showToast(handle);
+    }
   };
 
   const handleOpenPost = (post) => {
@@ -87,7 +85,7 @@ export default function ProfileScreen({
   };
 
   return (
-    <section className="profile-screen" aria-label="Olivia Beits profile">
+    <section className="profile-screen" aria-label={`${displayName} profile`}>
       {/* Pinned Top Controls */}
       <header className="profile-top-bar">
         <button
@@ -151,22 +149,11 @@ export default function ProfileScreen({
                   role="menuitem"
                   className="profile-more-item"
                   onClick={() => {
-                    triggerLightHaptic();
                     setMenuOpen(false);
+                    handleCopyHandle();
                   }}
                 >
-                  Share profile
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="profile-more-item"
-                  onClick={() => {
-                    triggerLightHaptic();
-                    setMenuOpen(false);
-                  }}
-                >
-                  Copy handle (@oliviia_be)
+                  Copy handle (@{username})
                 </button>
                 {(onLogout || onResetOnboarding) && (
                   <button
@@ -188,109 +175,163 @@ export default function ProfileScreen({
         </div>
       </header>
 
-      {/* Scrollable Profile Feed */}
+      {/* Scrollable Real User Profile */}
       <div className="profile-scroll">
-        {/* Hero Portrait + Progressive Blur Scrim */}
+        {/* User Portrait Backdrop + Progressive Blur Scrim */}
         <div className="profile-backdrop" aria-hidden="true">
-          <img src={profileHero} alt="" className="profile-hero-img" />
-          <img src={profileHero} alt="" className="profile-hero-blur" />
+          <img src={avatarSrc} alt="" className="profile-hero-img" />
+          <img src={avatarSrc} alt="" className="profile-hero-blur" />
           <div className="profile-scrim" />
         </div>
 
-        {/* First Fold — Matches exact reference screen */}
         <div className="profile-first-fold">
           <div className="profile-spacer" />
 
           <div className="profile-body">
-            <h1 className="profile-name">Olivia Beits</h1>
-            <p className="profile-handle">@oliviia_be</p>
+            <div className="profile-name-row">
+              <h1 className="profile-name">{displayName}</h1>
+              {showBadges &&
+                isFounder &&
+                (roleDetails?.companyLogoUrl ? (
+                  <img
+                    src={roleDetails.companyLogoUrl}
+                    alt={roleDetails.companyName || 'Company badge'}
+                    title={
+                      roleDetails.companyName
+                        ? `Founder of ${roleDetails.companyName}`
+                        : 'Founder'
+                    }
+                    className="profile-founder-badge"
+                  />
+                ) : roleDetails?.companyName ? (
+                  <span
+                    className="profile-founder-monogram"
+                    title={`Founder of ${roleDetails.companyName}`}
+                  >
+                    {roleDetails.companyName.trim().charAt(0).toUpperCase()}
+                  </span>
+                ) : null)}
+            </div>
+            <p className="profile-handle">@{username}</p>
 
             <div className="profile-actions">
-              <button
-                type="button"
-                className={`profile-follow-btn ${isFollowing ? 'following' : ''}`}
-                onClick={handleFollow}
-              >
-                {isFollowing ? 'Following' : 'Follow'}
-              </button>
+              {onOpenSettings && (
+                <button
+                  type="button"
+                  className="profile-follow-btn"
+                  onClick={() => {
+                    triggerLightHaptic();
+                    onOpenSettings();
+                  }}
+                >
+                  Settings &amp; Edit
+                </button>
+              )}
 
               <button
                 type="button"
                 className="profile-msg-btn"
-                onClick={handleMessage}
-                aria-label="Message Olivia Beits"
+                onClick={handleCopyHandle}
+                aria-label={`Copy handle @${username}`}
+                title="Copy handle"
               >
-                <MessageBubbleIcon />
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <rect
+                    x="9"
+                    y="9"
+                    width="11"
+                    height="11"
+                    rx="2.5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  />
+                  <path
+                    d="M6 15H5C3.9 15 3 14.1 3 13V5C3 3.9 3.9 3 5 3H13C14.1 3 15 3.9 15 5V6"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
               </button>
             </div>
 
             <div className="profile-stats">
               <div className="profile-stat">
-                <div className="profile-stat-value">252</div>
+                <div className="profile-stat-value">
+                  {overview.followingCount}
+                </div>
                 <div className="profile-stat-label">Following</div>
               </div>
               <div className="profile-stat">
-                <div className="profile-stat-value">24K</div>
+                <div className="profile-stat-value">
+                  {overview.followersCount}
+                </div>
                 <div className="profile-stat-label">Followers</div>
               </div>
               <div className="profile-stat">
-                <div className="profile-stat-value">732</div>
-                <div className="profile-stat-label">Creations</div>
+                <div className="profile-stat-value">{overview.postsCount}</div>
+                <div className="profile-stat-label">Posts</div>
               </div>
             </div>
 
             <div className="profile-bio-card">
               <p className="profile-bio-text">
-                Designers focused on creating impactful, user-cantered digital
-                experiences and branding.
+                {bioText || 'No bio yet — customize your profile in Settings.'}
               </p>
             </div>
 
-            <div className="profile-gallery">
-              {FEATURED_POSTS.map((post) => (
+            {loadingOverview ? (
+              <div className="profile-empty-state">
+                <p className="profile-empty-sub">Loading your posts...</p>
+              </div>
+            ) : overview.posts.length === 0 ? (
+              <div className="profile-empty-state">
+                <div className="profile-empty-title">No posts yet</div>
+                <p className="profile-empty-sub">
+                  You haven&apos;t posted anything yet. Share your first post from
+                  the Home feed and it will show up right here.
+                </p>
                 <button
-                  key={post.id}
                   type="button"
-                  className="profile-gallery-card"
-                  onClick={() => handleOpenPost(post)}
-                  aria-label={post.title}
+                  className="profile-empty-cta"
+                  onClick={() => {
+                    triggerLightHaptic();
+                    onClose();
+                  }}
                 >
-                  <img
-                    src={post.image}
-                    alt={post.alt}
-                    className="profile-gallery-img"
-                  />
+                  Back to Home Feed
                 </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Additional Scrollable Creations Grid */}
-        <div className="profile-more-posts">
-          <div className="profile-gallery">
-            {MORE_POSTS.map((post) => (
-              <button
-                key={post.id}
-                type="button"
-                className="profile-gallery-card profile-gallery-card-tall"
-                onClick={() => handleOpenPost(post)}
-                aria-label={post.title}
-              >
-                <img
-                  src={post.image}
-                  alt={post.alt}
-                  className="profile-gallery-img"
-                />
-              </button>
-            ))}
+              </div>
+            ) : (
+              <div className="profile-gallery">
+                {overview.posts.map((post) => (
+                  <button
+                    key={post.id}
+                    type="button"
+                    className="profile-gallery-card"
+                    onClick={() => handleOpenPost(post)}
+                    aria-label={post.title}
+                  >
+                    {post.image ? (
+                      <img
+                        src={post.image}
+                        alt={post.alt}
+                        className="profile-gallery-img"
+                      />
+                    ) : (
+                      <div className="profile-text-post-tile">{post.title}</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {messageToast && (
+      {toastMsg && (
         <div className="profile-toast" role="status">
-          Direct message ready for @oliviia_be
+          {toastMsg}
         </div>
       )}
 
@@ -303,15 +344,20 @@ export default function ProfileScreen({
           onClick={onClosePost}
         >
           <div className="post-modal-card" onClick={(e) => e.stopPropagation()}>
-            <img
-              src={selectedPost.image}
-              alt={selectedPost.alt}
-              className="post-modal-img"
-            />
+            {selectedPost.image && (
+              <img
+                src={selectedPost.image}
+                alt={selectedPost.alt}
+                className="post-modal-img"
+              />
+            )}
             <div className="post-modal-meta">
               <div>
                 <div className="post-modal-title">{selectedPost.title}</div>
-                <div className="post-modal-tag">{selectedPost.tag} · @oliviia_be</div>
+                <div className="post-modal-tag">
+                  @{username} · {selectedPost.likesCount ?? 0} likes ·{' '}
+                  {selectedPost.time}
+                </div>
               </div>
               <button
                 type="button"

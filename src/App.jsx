@@ -338,6 +338,15 @@ export default function App() {
               setAppLocked(true);
             }
           });
+          fetchUserSettings(synced.id).then((remoteSettings) => {
+            setSettings(remoteSettings);
+            if (
+              remoteSettings.biometricLockEnabled &&
+              remoteSettings.hasPasscode
+            ) {
+              setAppLocked(true);
+            }
+          });
         }
         setSetupData((prev) => ({
           ...prev,
@@ -703,6 +712,15 @@ export default function App() {
           />
         ) : activeTab === 'profile' ? (
           <ProfileScreen
+            currentUser={{
+              id: profileId,
+              name: selectedUser.name,
+              username: setupData.username,
+              bio: setupData.bio || '',
+              avatar: setupData.avatar,
+            }}
+            roleDetails={roleDetails}
+            showBadges={settings.showBadges}
             onClose={handleCloseProfile}
             selectedPost={selectedPost}
             onSelectPost={setSelectedPost}
@@ -936,6 +954,21 @@ export default function App() {
           <div className="app-exit-toast" role="status">
             Swipe back again to exit
           </div>
+        )}
+
+        {appLocked && !showSplash && settings.hasPasscode && (
+          <PasscodeLockScreen
+            mode="unlock"
+            user={{
+              name: selectedUser.name,
+              username: setupData.username,
+              avatar: setupData.avatar,
+            }}
+            storedPasscodeHash={settings.passcodeHash}
+            biometricCredentialId={settings.biometricCredentialId}
+            onUnlocked={() => setAppLocked(false)}
+            onForgotLogout={handleLogout}
+          />
         )}
 
         {appLocked && !showSplash && settings.hasPasscode && (

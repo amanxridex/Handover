@@ -55,3 +55,4 @@ create policy "Anyone can insert feedback"
 drop policy if exists "Feedback is readable" on public.user_feedback;
 create policy "Feedback is readable"
   on public.user_feedback for select using (true);
+

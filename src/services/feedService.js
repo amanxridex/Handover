@@ -410,3 +410,53 @@ export async function toggleCommentLikeInDb({
     // Ignore network error
   }
 }
+
+export async function fetchUserProfileOverview(profileId) {
+  const empty = {
+    posts: [],
+    followersCount: 0,
+    followingCount: 0,
+    postsCount: 0,
+  };
+  if (!profileId || !isSupabaseConfigured || !supabase || !isUuid(profileId)) {
+    return empty;
+  }
+  try {
+    const [postsRes, followersRes, followingRes] = await Promise.all([
+      supabase
+        .from('posts')
+        .select('id, headline, image_url, category, likes_count, created_at')
+        .eq('author_id', profileId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('following_id', profileId),
+      supabase
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('follower_id', profileId),
+    ]);
+
+    const posts = Array.isArray(postsRes.data)
+      ? postsRes.data.map((row) => ({
+          id: row.id,
+          title: row.headline,
+          image: row.image_url || '',
+          alt: row.headline,
+          tag: row.category || 'Post',
+          likesCount: row.likes_count || 0,
+          time: formatRelativeTime(row.created_at),
+        }))
+      : [];
+
+    return {
+      posts,
+      followersCount: followersRes.count || 0,
+      followingCount: followingRes.count || 0,
+      postsCount: posts.length,
+    };
+  } catch {
+    return empty;
+  }
+}
