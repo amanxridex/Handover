@@ -726,8 +726,6 @@ export default function App() {
             onSelectPost={setSelectedPost}
             onClosePost={goBackInHistory}
             onOpenSettings={() => setSettingsOpen(true)}
-            onResetOnboarding={handleLogout}
-            onLogout={handleLogout}
           />
         ) : activeTab === 'home' && notificationsOpen ? (
           <NotificationsScreen

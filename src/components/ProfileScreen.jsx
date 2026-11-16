@@ -2,7 +2,20 @@ import React, { useEffect, useState } from 'react';
 import avatarDefault from '../assets/avatar-default.jpg';
 import { fetchUserProfileOverview } from '../services/feedService';
 import { triggerLightHaptic } from '../utils/nativeBridge';
-import { CloseXIcon, MoreDotsIcon } from './Icons';
+import { CloseXIcon } from './Icons';
+
+function GearIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" stroke="#FFFFFF" strokeWidth="1.9" />
+      <path
+        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.79 1.02 1.51 1.08H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+        stroke="#FFFFFF"
+        strokeWidth="1.7"
+      />
+    </svg>
+  );
+}
 
 export default function ProfileScreen({
   currentUser,
@@ -12,11 +25,8 @@ export default function ProfileScreen({
   selectedPost,
   onSelectPost,
   onClosePost,
-  onResetOnboarding,
   onOpenSettings,
-  onLogout,
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
   const [loadingOverview, setLoadingOverview] = useState(true);
   const [overview, setOverview] = useState({
@@ -102,79 +112,17 @@ export default function ProfileScreen({
           <CloseXIcon />
         </button>
 
-        <div className="profile-top-right">
-          {onLogout && (
-            <button
-              type="button"
-              className="profile-logout-pill"
-              onClick={() => {
-                triggerLightHaptic();
-                onLogout();
-              }}
-            >
-              Log out
-            </button>
-          )}
-
-          <div className="profile-more-wrap">
-            <button
-              type="button"
-              className="profile-circle-btn"
-              onClick={() => {
-                triggerLightHaptic();
-                setMenuOpen((prev) => !prev);
-              }}
-              aria-label="More options"
-              aria-expanded={menuOpen}
-            >
-              <MoreDotsIcon />
-            </button>
-
-            {menuOpen && (
-              <div className="profile-more-menu" role="menu">
-                {onOpenSettings && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="profile-more-item is-accent"
-                    onClick={() => {
-                      triggerLightHaptic();
-                      setMenuOpen(false);
-                      onOpenSettings();
-                    }}
-                  >
-                    Settings
-                  </button>
-                )}
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="profile-more-item"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    handleCopyHandle();
-                  }}
-                >
-                  Copy handle (@{username})
-                </button>
-                {(onLogout || onResetOnboarding) && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="profile-more-item is-danger"
-                    onClick={() => {
-                      triggerLightHaptic();
-                      setMenuOpen(false);
-                      (onLogout || onResetOnboarding)();
-                    }}
-                  >
-                    Log out
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        <button
+          type="button"
+          className="profile-circle-btn"
+          onClick={() => {
+            triggerLightHaptic();
+            onOpenSettings?.();
+          }}
+          aria-label="Open settings"
+        >
+          <GearIcon />
+        </button>
       </header>
 
       {/* Scrollable Real User Profile */}

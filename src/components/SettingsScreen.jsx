@@ -769,19 +769,21 @@ export default function SettingsScreen({
           )}
         </div>
 
-        {/* Log out card */}
-        <div className="settings-card-group">
-          <button
-            type="button"
-            className="settings-row settings-logout-row"
-            onClick={() => {
-              triggerLightHaptic();
-              onLogout?.();
-            }}
-          >
-            <span className="settings-row-label">Log out</span>
-          </button>
-        </div>
+        {/* Log out row */}
+        {matchesQuery('log out logout sign out account exit') && (
+          <div className="settings-card-group">
+            <button
+              type="button"
+              className="settings-row settings-logout-row"
+              onClick={() => {
+                triggerLightHaptic();
+                onLogout?.();
+              }}
+            >
+              <span className="settings-row-label">Log out</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Sub-sheets */}
