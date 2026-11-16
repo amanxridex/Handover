@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { getStoredSessionToken } from './profileService';
 
 const ACTOR_KEY_STORAGE = 'handover_actor_key_v1';
 const UUID_RE =
@@ -70,6 +71,7 @@ export async function fetchFeedPosts() {
         )
       `
       )
+      .eq('is_deleted', false)
       .order('created_at', { ascending: false })
       .limit(25);
 
@@ -153,10 +155,50 @@ export async function fetchFeedEngagement({ postKeys, actorKey }) {
 }
 
 export async function createFeedPost(post) {
-  if (!isSupabaseConfigured || !supabase || !post.authorId) {
-    return null;
+  if (!isSupabaseConfigured || !supabase) {
+    return { post: null, error: 'Database not configured' };
   }
+
+  const token = getStoredSessionToken();
+
   try {
+    if (token) {
+      const { data, error } = await supabase.rpc('create_authenticated_post', {
+        p_session_token: token,
+        p_headline: post.headline,
+        p_image_url: post.image || null,
+        p_category: 'Personal',
+      });
+
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!error && row?.id) {
+        return {
+          post: {
+            ...post,
+            id: row.id,
+            authorName: row.author_name || post.authorName,
+            authorHandle: row.author_username
+              ? `@${row.author_username}`
+              : post.authorHandle,
+            avatar: row.author_avatar_url || post.avatar,
+            authorRole: row.author_role || post.authorRole,
+            companyName: row.author_company_name || post.companyName || '',
+            companyLogoUrl:
+              row.author_company_logo_url || post.companyLogoUrl || '',
+            time: 'Just now',
+          },
+          error: null,
+        };
+      }
+      if (error) {
+        return { post: null, error: error.message || 'Could not save post' };
+      }
+    }
+
+    if (!post.authorId || !isUuid(post.authorId)) {
+      return { post: null, error: 'Sign in again to sync posts to database' };
+    }
+
     const { data, error } = await supabase
       .from('posts')
       .insert({
@@ -173,14 +215,19 @@ export async function createFeedPost(post) {
       .select('id, created_at')
       .single();
 
-    if (error || !data) return null;
+    if (error || !data) {
+      return { post: null, error: error?.message || 'Failed to publish post' };
+    }
     return {
-      ...post,
-      id: data.id,
-      time: 'Just now',
+      post: {
+        ...post,
+        id: data.id,
+        time: 'Just now',
+      },
+      error: null,
     };
-  } catch {
-    return null;
+  } catch (err) {
+    return { post: null, error: err?.message || 'Network error saving post' };
   }
 }
 
@@ -411,31 +458,53 @@ export async function toggleCommentLikeInDb({
   }
 }
 
-export async function fetchUserProfileOverview(profileId) {
+export async function fetchUserProfileOverview(profileId, username) {
   const empty = {
     posts: [],
     followersCount: 0,
     followingCount: 0,
     postsCount: 0,
   };
-  if (!profileId || !isSupabaseConfigured || !supabase || !isUuid(profileId)) {
+  const hasId = Boolean(profileId && isUuid(profileId));
+  const cleanUsername = (username || '').trim().replace(/^@+/, '');
+  if (!isSupabaseConfigured || !supabase || (!hasId && !cleanUsername)) {
     return empty;
   }
   try {
+    let postsQuery = supabase
+      .from('posts')
+      .select('id, headline, image_url, category, likes_count, created_at')
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: false });
+
+    if (hasId && cleanUsername) {
+      postsQuery = postsQuery.or(
+        `author_id.eq.${profileId},author_username.ilike.${cleanUsername}`
+      );
+    } else if (hasId) {
+      postsQuery = postsQuery.eq('author_id', profileId);
+    } else {
+      postsQuery = postsQuery.ilike('author_username', cleanUsername);
+    }
+
+    const followersPromise = hasId
+      ? supabase
+          .from('follows')
+          .select('*', { count: 'exact', head: true })
+          .eq('following_id', profileId)
+      : Promise.resolve({ count: 0 });
+
+    const followingPromise = hasId
+      ? supabase
+          .from('follows')
+          .select('*', { count: 'exact', head: true })
+          .eq('follower_id', profileId)
+      : Promise.resolve({ count: 0 });
+
     const [postsRes, followersRes, followingRes] = await Promise.all([
-      supabase
-        .from('posts')
-        .select('id, headline, image_url, category, likes_count, created_at')
-        .eq('author_id', profileId)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('follows')
-        .select('*', { count: 'exact', head: true })
-        .eq('following_id', profileId),
-      supabase
-        .from('follows')
-        .select('*', { count: 'exact', head: true })
-        .eq('follower_id', profileId),
+      postsQuery,
+      followersPromise,
+      followingPromise,
     ]);
 
     const posts = Array.isArray(postsRes.data)

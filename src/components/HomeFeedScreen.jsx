@@ -356,9 +356,8 @@ export default function HomeFeedScreen({
     setNewHeadline('');
     setNewImage('');
     setCreateOpen(false);
-    showNotice('Post published!');
 
-    const saved = await createFeedPost({
+    const { post: saved, error } = await createFeedPost({
       authorId: currentUser?.id || null,
       authorName: draftPost.authorName,
       authorHandle: draftPost.authorHandle,
@@ -373,8 +372,12 @@ export default function HomeFeedScreen({
     });
     if (saved?.id) {
       setPosts((prev) =>
-        prev.map((p) => (p.id === optimisticId ? { ...p, id: saved.id } : p))
+        prev.map((p) => (p.id === optimisticId ? saved : p))
       );
+      showNotice('Post published!');
+    } else {
+      setPosts((prev) => prev.filter((p) => p.id !== optimisticId));
+      showNotice(error || 'Could not save post to database');
     }
   };
 

@@ -51,15 +51,17 @@ export default function ProfileScreen({
   useEffect(() => {
     let active = true;
     setLoadingOverview(true);
-    fetchUserProfileOverview(currentUser?.id).then((data) => {
-      if (!active) return;
-      setOverview(data);
-      setLoadingOverview(false);
-    });
+    fetchUserProfileOverview(currentUser?.id, currentUser?.username).then(
+      (data) => {
+        if (!active) return;
+        setOverview(data);
+        setLoadingOverview(false);
+      }
+    );
     return () => {
       active = false;
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, currentUser?.username]);
 
   const showToast = (msg) => {
     setToastMsg(msg);
