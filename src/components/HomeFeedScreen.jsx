@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import avatarDefault from '../assets/avatar-default.jpg';
 import avatarJacob from '../assets/avatar-jacob.jpg';
 import creation3 from '../assets/creation-3.jpg';
@@ -11,12 +11,14 @@ import handoverMark from '../assets/logos/handover-mark.png';
 import profileHero from '../assets/profile-hero.jpg';
 import {
   createFeedPost,
+  fetchFeedEngagement,
   fetchFeedPosts,
-  savePostComment,
-  updatePostLikes,
+  getClientActorKey,
+  togglePostLikeInDb,
 } from '../services/feedService';
 import { compressImageFile } from '../utils/imageCompress';
 import { triggerLightHaptic } from '../utils/nativeBridge';
+import CommentsDrawer from './CommentsDrawer';
 import {
   BellIcon,
   ChevronDownIcon,
@@ -56,6 +58,7 @@ const INITIAL_POSTS = [
     headline: 'Check out my pillow fight with beautiful views',
     image: feedPillowFight,
     likesCount: 24,
+    commentsCount: 3,
     liked: false,
   },
   {
@@ -70,6 +73,7 @@ const INITIAL_POSTS = [
     headline: 'Golden hour above the skyline with my favourite crew',
     image: feedWarmPost,
     likesCount: 18,
+    commentsCount: 1,
     liked: false,
   },
   {
@@ -84,6 +88,7 @@ const INITIAL_POSTS = [
     headline: 'Courtside dusk sessions & twilight match point',
     image: creation3,
     likesCount: 41,
+    commentsCount: 1,
     liked: false,
   },
 ];
@@ -93,6 +98,9 @@ export default function HomeFeedScreen({
   unreadNotifications,
   onOpenNotifications,
   onOpenProfile,
+  activeCommentsPostId,
+  onOpenComments,
+  onCloseComments,
   tabs,
   activeTab,
   onSelectTab,
@@ -102,7 +110,6 @@ export default function HomeFeedScreen({
   const [feedMode, setFeedMode] = useState('Feed');
   const [feedMenuOpen, setFeedMenuOpen] = useState(false);
   const [posts, setPosts] = useState(INITIAL_POSTS);
-  const [commentDrafts, setCommentDrafts] = useState({});
   const [postedNotice, setPostedNotice] = useState('');
 
   // Create Post sheet state
@@ -110,21 +117,62 @@ export default function HomeFeedScreen({
   const [newHeadline, setNewHeadline] = useState('');
   const [newImage, setNewImage] = useState('');
 
-  // Load live feed posts from Supabase
+  const actorKey = useMemo(
+    () => getClientActorKey(currentUser?.id),
+    [currentUser?.id]
+  );
+
+  // Load live feed posts + live likes & comment counts from Supabase
   useEffect(() => {
     let active = true;
-    fetchFeedPosts().then((remotePosts) => {
-      if (!active || !remotePosts || remotePosts.length === 0) return;
-      setPosts((prev) => {
-        const remoteIds = new Set(remotePosts.map((p) => p.id));
-        const remainingLocal = prev.filter((p) => !remoteIds.has(p.id));
-        return [...remotePosts, ...remainingLocal];
+    (async () => {
+      const remotePosts = await fetchFeedPosts();
+      if (!active) return;
+
+      const starterIds = INITIAL_POSTS.map((p) => p.id);
+      const allKeys = [
+        ...new Set([
+          ...starterIds,
+          ...(remotePosts || []).map((p) => String(p.id)),
+        ]),
+      ];
+
+      const engagement = await fetchFeedEngagement({
+        postKeys: allKeys,
+        actorKey,
       });
-    });
+      if (!active) return;
+
+      setPosts((prev) => {
+        const remoteList = remotePosts || [];
+        const remoteIds = new Set(remoteList.map((p) => p.id));
+        const merged = [
+          ...remoteList,
+          ...prev.filter((p) => !remoteIds.has(p.id)),
+        ];
+
+        return merged.map((post) => {
+          const key = String(post.id);
+          const counterOverride = engagement.countersByPost?.[key];
+          const dbCommentCount = engagement.commentCountsByPost?.[key];
+          return {
+            ...post,
+            likesCount:
+              counterOverride !== undefined ? counterOverride : post.likesCount,
+            commentsCount:
+              dbCommentCount !== undefined
+                ? dbCommentCount
+                : post.commentsCount || 0,
+            liked: engagement.likedPostKeys?.has(key) || post.liked,
+          };
+        });
+      });
+    })();
+
     return () => {
       active = false;
     };
-  }, []);
+  }, [actorKey]);
 
   const showNotice = (msg) => {
     setPostedNotice(msg);
@@ -133,34 +181,42 @@ export default function HomeFeedScreen({
 
   const toggleLike = (postId) => {
     triggerLightHaptic();
-    let updatedCount = null;
+    let nextState = null;
     setPosts((prev) =>
       prev.map((p) => {
         if (p.id !== postId) return p;
         const nextLiked = !p.liked;
-        updatedCount = Math.max(0, (p.likesCount || 0) + (nextLiked ? 1 : -1));
+        const updatedCount = Math.max(
+          0,
+          (p.likesCount || 0) + (nextLiked ? 1 : -1)
+        );
+        nextState = { liked: nextLiked, likesCount: updatedCount };
         return { ...p, liked: nextLiked, likesCount: updatedCount };
       })
     );
-    if (updatedCount !== null) {
-      updatePostLikes(postId, updatedCount);
+    if (nextState) {
+      togglePostLikeInDb({
+        postId,
+        actorKey,
+        liked: nextState.liked,
+        likesCount: nextState.likesCount,
+      });
     }
   };
 
-  const handleCommentSubmit = async (e, postId) => {
-    e.preventDefault();
-    const text = (commentDrafts[postId] || '').trim();
-    if (!text) return;
-    triggerLightHaptic();
-    setCommentDrafts((prev) => ({ ...prev, [postId]: '' }));
-    showNotice('Comment added');
-    await savePostComment({
-      postId,
-      authorId: currentUser?.id || null,
-      authorName: currentUser?.name || currentUser?.username || 'You',
-      body: text,
-    });
+  const handleCommentsCountChange = (postId, count) => {
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, commentsCount: count } : p))
+    );
   };
+
+  const activeCommentsPost = useMemo(
+    () =>
+      activeCommentsPostId
+        ? posts.find((p) => String(p.id) === String(activeCommentsPostId)) || null
+        : null,
+    [activeCommentsPostId, posts]
+  );
 
   const handlePostPhotoChange = async (e) => {
     const file = e.target.files?.[0];
@@ -201,6 +257,7 @@ export default function HomeFeedScreen({
       headline,
       image: newImage || feedWarmPost,
       likesCount: 0,
+      commentsCount: 0,
       liked: false,
     };
     setPosts((prev) => [draftPost, ...prev]);
@@ -400,33 +457,31 @@ export default function HomeFeedScreen({
               </div>
 
               <div className="feed-card-bottom">
-                <form
-                  className="feed-comment-pill"
-                  onSubmit={(e) => handleCommentSubmit(e, post.id)}
+                <button
+                  type="button"
+                  className="feed-comment-pill feed-comment-trigger"
+                  onClick={() => {
+                    triggerLightHaptic();
+                    onOpenComments?.(post.id);
+                  }}
                 >
                   <CommentBubbleIcon />
-                  <input
-                    type="text"
-                    className="feed-comment-input"
-                    placeholder="Add comment"
-                    value={commentDrafts[post.id] || ''}
-                    onChange={(e) =>
-                      setCommentDrafts((prev) => ({
-                        ...prev,
-                        [post.id]: e.target.value,
-                      }))
-                    }
-                  />
-                </form>
+                  <span className="feed-comment-trigger-text">
+                    {post.commentsCount > 0
+                      ? `View ${post.commentsCount} comment${post.commentsCount === 1 ? '' : 's'} · Add comment`
+                      : 'Add comment'}
+                  </span>
+                </button>
 
                 <button
                   type="button"
-                  className="feed-heart-btn"
+                  className={`feed-heart-pill ${post.liked ? 'liked' : ''}`}
                   onClick={() => toggleLike(post.id)}
                   aria-label={post.liked ? 'Unlike post' : 'Like post'}
                   aria-pressed={post.liked}
                 >
                   <HeartIcon filled={post.liked} />
+                  <span className="feed-heart-count">{post.likesCount ?? 0}</span>
                 </button>
               </div>
             </article>
@@ -519,6 +574,17 @@ export default function HomeFeedScreen({
             </button>
           </form>
         </div>
+      )}
+
+      {activeCommentsPost && (
+        <CommentsDrawer
+          post={activeCommentsPost}
+          currentUser={currentUser}
+          actorKey={actorKey}
+          onClose={() => onCloseComments?.()}
+          onTogglePostLike={toggleLike}
+          onCommentsCountChange={handleCommentsCountChange}
+        />
       )}
 
       {postedNotice && (

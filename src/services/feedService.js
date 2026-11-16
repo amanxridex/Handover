@@ -1,6 +1,32 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
-function formatRelativeTime(iso) {
+const ACTOR_KEY_STORAGE = 'handover_actor_key_v1';
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value) {
+  return UUID_RE.test(String(value || ''));
+}
+
+export function getClientActorKey(profileId) {
+  if (profileId) return `profile:${profileId}`;
+  try {
+    let existing = window.localStorage.getItem(ACTOR_KEY_STORAGE);
+    if (!existing) {
+      const rand =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      existing = `device:${rand}`;
+      window.localStorage.setItem(ACTOR_KEY_STORAGE, existing);
+    }
+    return existing;
+  } catch {
+    return 'device:guest';
+  }
+}
+
+export function formatRelativeTime(iso) {
   if (!iso) return 'Just now';
   const diffSec = Math.max(
     0,
@@ -68,11 +94,61 @@ export async function fetchFeedPosts() {
         headline: row.headline,
         image: row.image_url || '',
         likesCount: row.likes_count || 0,
+        commentsCount: 0,
         liked: false,
       };
     });
   } catch {
     return [];
+  }
+}
+
+export async function fetchFeedEngagement({ postKeys, actorKey }) {
+  if (!isSupabaseConfigured || !supabase || !postKeys?.length) {
+    return { countersByPost: {}, likedPostKeys: new Set(), commentCountsByPost: {} };
+  }
+  try {
+    const [countersRes, likesRes, commentsRes] = await Promise.all([
+      supabase
+        .from('post_counters')
+        .select('post_key, likes_count')
+        .in('post_key', postKeys),
+      supabase
+        .from('post_likes')
+        .select('post_key')
+        .eq('actor_key', actorKey)
+        .in('post_key', postKeys),
+      supabase
+        .from('post_comments')
+        .select('post_key')
+        .in('post_key', postKeys),
+    ]);
+
+    const countersByPost = {};
+    if (Array.isArray(countersRes.data)) {
+      for (const row of countersRes.data) {
+        countersByPost[row.post_key] = row.likes_count || 0;
+      }
+    }
+
+    const likedPostKeys = new Set();
+    if (Array.isArray(likesRes.data)) {
+      for (const row of likesRes.data) {
+        likedPostKeys.add(row.post_key);
+      }
+    }
+
+    const commentCountsByPost = {};
+    if (Array.isArray(commentsRes.data)) {
+      for (const row of commentsRes.data) {
+        commentCountsByPost[row.post_key] =
+          (commentCountsByPost[row.post_key] || 0) + 1;
+      }
+    }
+
+    return { countersByPost, likedPostKeys, commentCountsByPost };
+  } catch {
+    return { countersByPost: {}, likedPostKeys: new Set(), commentCountsByPost: {} };
   }
 }
 
@@ -108,37 +184,228 @@ export async function createFeedPost(post) {
   }
 }
 
-export async function updatePostLikes(postId, likesCount) {
+export async function togglePostLikeInDb({
+  postId,
+  actorKey,
+  liked,
+  likesCount,
+}) {
   if (!isSupabaseConfigured || !supabase) return;
-  const isUuid =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      String(postId)
-    );
-  if (!isUuid) return;
+  const postKey = String(postId);
+  const safeCount = Math.max(0, likesCount);
   try {
-    await supabase
-      .from('posts')
-      .update({ likes_count: Math.max(0, likesCount) })
-      .eq('id', postId);
+    const tasks = [];
+    if (isUuid(postKey)) {
+      tasks.push(
+        supabase
+          .from('posts')
+          .update({ likes_count: safeCount })
+          .eq('id', postKey)
+      );
+    } else {
+      tasks.push(
+        supabase
+          .from('post_counters')
+          .upsert(
+            { post_key: postKey, likes_count: safeCount },
+            { onConflict: 'post_key' }
+          )
+      );
+    }
+
+    if (actorKey) {
+      if (liked) {
+        tasks.push(
+          supabase
+            .from('post_likes')
+            .upsert(
+              { post_key: postKey, actor_key: actorKey },
+              { onConflict: 'post_key,actor_key' }
+            )
+        );
+      } else {
+        tasks.push(
+          supabase
+            .from('post_likes')
+            .delete()
+            .eq('post_key', postKey)
+            .eq('actor_key', actorKey)
+        );
+      }
+    }
+
+    await Promise.all(tasks);
   } catch {
     // Ignore network error
   }
 }
 
-export async function savePostComment({ postId, authorId, authorName, body }) {
-  if (!isSupabaseConfigured || !supabase) return;
-  const isUuid =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      String(postId)
-    );
-  if (!isUuid) return;
+export async function fetchPostComments({ postId, actorKey }) {
+  if (!isSupabaseConfigured || !supabase || !postId) return [];
+  const postKey = String(postId);
   try {
-    await supabase.from('post_comments').insert({
-      post_id: postId,
-      author_id: authorId || null,
+    const { data, error } = await supabase
+      .from('post_comments')
+      .select(
+        `
+        id,
+        post_id,
+        post_key,
+        parent_comment_id,
+        author_id,
+        author_name,
+        author_username,
+        author_avatar_url,
+        author_role,
+        author_company_name,
+        author_company_logo_url,
+        body,
+        likes_count,
+        created_at
+      `
+      )
+      .eq('post_key', postKey)
+      .order('created_at', { ascending: true });
+
+    if (error || !Array.isArray(data)) return [];
+
+    let likedIds = new Set();
+    if (actorKey && data.length > 0) {
+      const commentIds = data.map((c) => c.id);
+      const { data: likesData } = await supabase
+        .from('comment_likes')
+        .select('comment_id')
+        .eq('actor_key', actorKey)
+        .in('comment_id', commentIds);
+      if (Array.isArray(likesData)) {
+        likedIds = new Set(likesData.map((l) => l.comment_id));
+      }
+    }
+
+    return data.map((row) => ({
+      id: row.id,
+      postKey: row.post_key || postKey,
+      parentCommentId: row.parent_comment_id || null,
+      authorId: row.author_id || null,
+      authorName: row.author_name || 'Member',
+      authorUsername: row.author_username || '',
+      authorAvatar: row.author_avatar_url || '',
+      authorRole: row.author_role || 'creator',
+      companyName: row.author_company_name || '',
+      companyLogoUrl: row.author_company_logo_url || '',
+      body: row.body,
+      likesCount: row.likes_count || 0,
+      liked: likedIds.has(row.id),
+      time: formatRelativeTime(row.created_at),
+      createdAt: row.created_at,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function createPostComment({
+  postId,
+  parentCommentId,
+  authorId,
+  authorName,
+  authorUsername,
+  authorAvatar,
+  authorRole,
+  companyName,
+  companyLogoUrl,
+  body,
+}) {
+  if (!isSupabaseConfigured || !supabase || !postId || !body?.trim()) {
+    return null;
+  }
+  const postKey = String(postId);
+  try {
+    const payload = {
+      post_id: isUuid(postKey) ? postKey : null,
+      post_key: postKey,
+      parent_comment_id: isUuid(parentCommentId) ? parentCommentId : null,
+      author_id: isUuid(authorId) ? authorId : null,
       author_name: authorName || 'Member',
-      body,
-    });
+      author_username: authorUsername ? authorUsername.replace(/^@/, '') : null,
+      author_avatar_url: authorAvatar || null,
+      author_role: authorRole || 'creator',
+      author_company_name: companyName || null,
+      author_company_logo_url: companyLogoUrl || null,
+      body: body.trim(),
+      likes_count: 0,
+    };
+
+    const { data, error } = await supabase
+      .from('post_comments')
+      .insert(payload)
+      .select(
+        'id, post_key, parent_comment_id, author_id, author_name, author_username, author_avatar_url, author_role, author_company_name, author_company_logo_url, body, likes_count, created_at'
+      )
+      .single();
+
+    if (error || !data) return null;
+
+    return {
+      id: data.id,
+      postKey: data.post_key,
+      parentCommentId: data.parent_comment_id || null,
+      authorId: data.author_id || null,
+      authorName: data.author_name,
+      authorUsername: data.author_username || '',
+      authorAvatar: data.author_avatar_url || '',
+      authorRole: data.author_role || 'creator',
+      companyName: data.author_company_name || '',
+      companyLogoUrl: data.author_company_logo_url || '',
+      body: data.body,
+      likesCount: data.likes_count || 0,
+      liked: false,
+      time: 'Just now',
+      createdAt: data.created_at,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function toggleCommentLikeInDb({
+  commentId,
+  actorKey,
+  liked,
+  likesCount,
+}) {
+  if (!isSupabaseConfigured || !supabase || !isUuid(commentId)) return;
+  const safeCount = Math.max(0, likesCount);
+  try {
+    const tasks = [
+      supabase
+        .from('post_comments')
+        .update({ likes_count: safeCount })
+        .eq('id', commentId),
+    ];
+
+    if (actorKey) {
+      if (liked) {
+        tasks.push(
+          supabase
+            .from('comment_likes')
+            .upsert(
+              { comment_id: commentId, actor_key: actorKey },
+              { onConflict: 'comment_id,actor_key' }
+            )
+        );
+      } else {
+        tasks.push(
+          supabase
+            .from('comment_likes')
+            .delete()
+            .eq('comment_id', commentId)
+            .eq('actor_key', actorKey)
+        );
+      }
+    }
+
+    await Promise.all(tasks);
   } catch {
     // Ignore network error
   }

@@ -127,7 +127,11 @@ function routeForSnapshot(snap) {
     return '/onboarding/role';
   }
   if (snap.activeTab === 'home') {
-    return snap.notificationsOpen ? '/notifications' : '/home';
+    if (snap.notificationsOpen) return '/notifications';
+    if (snap.activeCommentsPostId) {
+      return `/post/${snap.activeCommentsPostId}/comments`;
+    }
+    return '/home';
   }
   if (snap.activeTab === 'chat') {
     return snap.activeChatId ? `/chat/${snap.activeChatId}` : '/chat';
@@ -146,6 +150,7 @@ function snapshotFromPathname(pathname, alreadyOnboarded) {
     offerOpen: false,
     hasPostModal: false,
     activeChatId: null,
+    activeCommentsPostId: null,
     notificationsOpen: false,
   };
   if (!alreadyOnboarded) {
@@ -158,6 +163,15 @@ function snapshotFromPathname(pathname, alreadyOnboarded) {
   }
   if (path === '/notifications') {
     return { ...base, flowStep: 'main', activeTab: 'home', notificationsOpen: true };
+  }
+  const commentsMatch = path.match(/^\/post\/([^/]+)\/comments$/);
+  if (commentsMatch) {
+    return {
+      ...base,
+      flowStep: 'main',
+      activeTab: 'home',
+      activeCommentsPostId: commentsMatch[1],
+    };
   }
   if (path === '/chat') return { ...base, flowStep: 'main', activeTab: 'chat' };
   if (path.startsWith('/chat/')) {
@@ -206,6 +220,9 @@ export default function App() {
   const [offerOpen, setOfferOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
   const [activeChatId, setActiveChatId] = useState(initialRouteSnap.activeChatId);
+  const [activeCommentsPostId, setActiveCommentsPostId] = useState(
+    initialRouteSnap.activeCommentsPostId || null
+  );
   const [notificationsOpen, setNotificationsOpen] = useState(
     initialRouteSnap.notificationsOpen
   );
@@ -230,6 +247,7 @@ export default function App() {
       offerOpen,
       hasPostModal: Boolean(selectedPost),
       activeChatId,
+      activeCommentsPostId,
       notificationsOpen,
     }),
     [
@@ -239,6 +257,7 @@ export default function App() {
       offerOpen,
       selectedPost,
       activeChatId,
+      activeCommentsPostId,
       notificationsOpen,
     ]
   );
@@ -249,8 +268,18 @@ export default function App() {
   // Initialize browser history sentinel + root entry and sync profile with Supabase
   useEffect(() => {
     const initialPath = routeForSnapshot(initialRouteSnap);
-    window.history.replaceState({ handoverSentinel: true }, '', initialPath);
-    window.history.pushState({ handoverNav: initialRouteSnap }, '', initialPath);
+    if (initialRouteSnap.activeCommentsPostId) {
+      const homeRoot = {
+        ...initialRouteSnap,
+        activeCommentsPostId: null,
+      };
+      window.history.replaceState({ handoverSentinel: true }, '', '/home');
+      window.history.pushState({ handoverNav: homeRoot }, '', '/home');
+      window.history.pushState({ handoverNav: initialRouteSnap }, '', initialPath);
+    } else {
+      window.history.replaceState({ handoverSentinel: true }, '', initialPath);
+      window.history.pushState({ handoverNav: initialRouteSnap }, '', initialPath);
+    }
     historyReadyRef.current = true;
 
     if (initialStored) {
@@ -312,6 +341,7 @@ export default function App() {
           setSelectedPost(null);
         }
         setActiveChatId(target.activeChatId || null);
+        setActiveCommentsPostId(target.activeCommentsPostId || null);
         setNotificationsOpen(Boolean(target.notificationsOpen));
         return;
       }
@@ -333,6 +363,7 @@ export default function App() {
         offerOpen,
         hasPostModal: Boolean(selectedPost),
         activeChatId,
+        activeCommentsPostId,
         notificationsOpen,
       };
       window.history.pushState(
@@ -351,6 +382,7 @@ export default function App() {
     offerOpen,
     selectedPost,
     activeChatId,
+    activeCommentsPostId,
     notificationsOpen,
   ]);
 
@@ -417,6 +449,7 @@ export default function App() {
     setActiveTab('home');
     setNotificationsOpen(false);
     setActiveChatId(null);
+    setActiveCommentsPostId(null);
     const resetRoot = {
       flowStep: 'onboarding',
       roleSubStep: 'role',
@@ -424,6 +457,7 @@ export default function App() {
       offerOpen: false,
       hasPostModal: false,
       activeChatId: null,
+      activeCommentsPostId: null,
       notificationsOpen: false,
     };
     isPoppingRef.current = true;
@@ -445,6 +479,7 @@ export default function App() {
       offerOpen: false,
       hasPostModal: false,
       activeChatId: null,
+      activeCommentsPostId: null,
       notificationsOpen: false,
     };
     isPoppingRef.current = true;
@@ -543,6 +578,9 @@ export default function App() {
             unreadNotifications={unreadNotifications}
             onOpenNotifications={() => setNotificationsOpen(true)}
             onOpenProfile={() => handleTabSelect('profile')}
+            activeCommentsPostId={activeCommentsPostId}
+            onOpenComments={(postId) => setActiveCommentsPostId(String(postId))}
+            onCloseComments={goBackInHistory}
             tabs={TABS}
             activeTab={activeTab}
             onSelectTab={handleTabSelect}
