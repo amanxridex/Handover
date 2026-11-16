@@ -320,7 +320,7 @@ export default function SettingsScreen({
       }
     }
 
-    if (!settings.passcodeHash) {
+    if (!settings.hasPasscode) {
       setPendingBioEnable(true);
       if (credentialId) {
         await onUpdateSettings({ biometricCredentialId: credentialId });
@@ -341,14 +341,14 @@ export default function SettingsScreen({
     );
   };
 
-  const handlePasscodeSet = async (hashed) => {
+  const handlePasscodeSet = async (rawPin) => {
     setPasscodeSetupOpen(false);
     await onUpdateSettings({
-      passcodeHash: hashed,
+      newPasscode: rawPin,
       biometricLockEnabled: pendingBioEnable || settings.biometricLockEnabled,
     });
     setPendingBioEnable(false);
-    showToast('Passcode saved & encrypted');
+    showToast('Passcode saved & encrypted on server');
   };
 
   const handleSendFeedback = async (e, kind) => {
@@ -523,7 +523,7 @@ export default function SettingsScreen({
               </span>
               <span className="settings-row-label">Passcode &amp; App Lock</span>
               <span className="settings-row-value">
-                {settings.passcodeHash ? 'Set' : 'Off'}
+                {settings.hasPasscode ? 'Set' : 'Off'}
               </span>
               <span className="settings-row-chevron">
                 <ChevronRight />
@@ -832,13 +832,13 @@ export default function SettingsScreen({
                     }}
                   >
                     <span className="onboarding-next-label">
-                      {settings.passcodeHash
+                      {settings.hasPasscode
                         ? 'Change 4-Digit Passcode'
                         : 'Set 4-Digit Passcode'}
                     </span>
                   </button>
 
-                  {settings.passcodeHash && (
+                  {settings.hasPasscode && (
                     <>
                       <button
                         type="button"
@@ -858,7 +858,7 @@ export default function SettingsScreen({
                         onClick={async () => {
                           triggerLightHaptic();
                           await onUpdateSettings({
-                            passcodeHash: '',
+                            clearPasscode: true,
                             biometricLockEnabled: false,
                           });
                           setActiveSheet(null);

@@ -1,6 +1,7 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
 const STORAGE_KEY = 'handover_profile_v1';
+const SESSION_TOKEN_KEY = 'handover_session_token_v1';
 
 const RESERVED_USERNAMES = new Set([
   'admin',
@@ -72,6 +73,26 @@ function mapDbRowToRecord(data, fallbackAvatar = '', fallbackLogo = '') {
   };
 }
 
+export function getStoredSessionToken() {
+  try {
+    return window.localStorage.getItem(SESSION_TOKEN_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function setStoredSessionToken(token) {
+  try {
+    if (token) {
+      window.localStorage.setItem(SESSION_TOKEN_KEY, token);
+    } else {
+      window.localStorage.removeItem(SESSION_TOKEN_KEY);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 export function persistLocalProfile(profileRecord) {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(profileRecord));
@@ -95,15 +116,26 @@ export function getStoredOnboardingState() {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return isProfileComplete(parsed) ? parsed : null;
+    if (!isProfileComplete(parsed)) return null;
+
+    // Prevent unauthenticated localStorage spoofing when Supabase auth is active
+    if (isSupabaseConfigured && !getStoredSessionToken()) {
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }
 }
 
 export function clearStoredOnboardingState() {
+  const token = getStoredSessionToken();
+  if (token && isSupabaseConfigured && supabase) {
+    supabase.rpc('logout_session', { p_session_token: token }).catch(() => {});
+  }
   try {
     window.localStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(SESSION_TOKEN_KEY);
   } catch {
     // Ignore storage errors
   }
@@ -160,7 +192,7 @@ export async function saveOnboardedProfile({ setupData, roleDetails }) {
   }
 
   try {
-    const { data, error } = await supabase.rpc('register_user_profile', {
+    const { data, error } = await supabase.rpc('register_user_session', {
       p_full_name: localProfile.setupData.name,
       p_username: cleanUsername,
       p_password: setupData.password || '',
@@ -196,7 +228,8 @@ export async function saveOnboardedProfile({ setupData, roleDetails }) {
     }
 
     const row = Array.isArray(data) ? data[0] : data;
-    if (row?.id) {
+    if (row?.id && row?.session_token) {
+      setStoredSessionToken(row.session_token);
       const synced = mapDbRowToRecord(
         row,
         localProfile.setupData.avatar,
@@ -205,12 +238,10 @@ export async function saveOnboardedProfile({ setupData, roleDetails }) {
       persistLocalProfile(synced);
       return { profile: synced };
     }
+    return { error: 'REGISTRATION_FAILED' };
   } catch {
-    // Keep offline local profile only if network is completely unreachable
+    return { error: 'Network error during registration. Please try again.' };
   }
-
-  persistLocalProfile(localProfile);
-  return { profile: localProfile };
 }
 
 export async function loginWithCredentials({ username, password }) {
@@ -224,7 +255,7 @@ export async function loginWithCredentials({ username, password }) {
   }
 
   try {
-    const { data, error } = await supabase.rpc('login_with_credentials', {
+    const { data, error } = await supabase.rpc('login_user_session', {
       p_username: cleanUsername,
       p_password: password,
     });
@@ -234,10 +265,11 @@ export async function loginWithCredentials({ username, password }) {
     }
 
     const row = Array.isArray(data) ? data[0] : data;
-    if (!row?.id) {
+    if (!row?.id || !row?.session_token) {
       return { error: 'Invalid @username or password' };
     }
 
+    setStoredSessionToken(row.session_token);
     const profile = mapDbRowToRecord(row);
     persistLocalProfile(profile);
     return { profile };
@@ -247,32 +279,40 @@ export async function loginWithCredentials({ username, password }) {
 }
 
 export async function syncProfileFromSupabase(stored) {
-  if (!stored || !isSupabaseConfigured || !supabase) return stored;
+  if (!stored) return { valid: false };
+  if (!isSupabaseConfigured || !supabase) {
+    return { valid: true, profile: stored };
+  }
+
+  const token = getStoredSessionToken();
+  if (!token) {
+    return { valid: false };
+  }
 
   try {
-    const query = supabase
-      .from('profiles')
-      .select(
-        'id, full_name, username, avatar_url, bio, role, company_name, company_logo_url, has_website, website_url, company_pitch, sector, content_types, instagram_handle, onboarding_completed'
-      )
-      .limit(1);
+    const { data, error } = await supabase.rpc('validate_session', {
+      p_session_token: token,
+    });
 
-    const { data, error } = stored.id
-      ? await query.eq('id', stored.id).maybeSingle()
-      : await query.ilike('username', stored.setupData.username).maybeSingle();
+    if (error) {
+      // Transient network / server error: keep local UI alive until next check
+      return { valid: true, profile: stored };
+    }
 
-    if (error || !data || !data.onboarding_completed) {
-      return stored;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row?.id || !row?.onboarding_completed) {
+      // Invalid, forged, or revoked session token -> force clean logout
+      return { valid: false };
     }
 
     const hydrated = mapDbRowToRecord(
-      data,
+      row,
       stored.setupData?.avatar,
       stored.roleDetails?.companyLogoUrl
     );
     persistLocalProfile(hydrated);
-    return hydrated;
+    return { valid: true, profile: hydrated };
   } catch {
-    return stored;
+    return { valid: true, profile: stored };
   }
 }

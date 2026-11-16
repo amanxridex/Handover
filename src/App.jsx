@@ -223,7 +223,7 @@ export default function App() {
     Boolean(
       alreadyOnboarded &&
         initialSettings.biometricLockEnabled &&
-        initialSettings.passcodeHash
+        initialSettings.hasPasscode
     )
   );
   const [settingsOpen, setSettingsOpen] = useState(
@@ -320,7 +320,12 @@ export default function App() {
     historyReadyRef.current = true;
 
     if (initialStored) {
-      syncProfileFromSupabase(initialStored).then((synced) => {
+      syncProfileFromSupabase(initialStored).then((result) => {
+        if (!result?.valid) {
+          handleLogout();
+          return;
+        }
+        const synced = result.profile;
         if (!synced) return;
         if (synced.id) {
           setProfileId(synced.id);
@@ -328,7 +333,7 @@ export default function App() {
             setSettings(remoteSettings);
             if (
               remoteSettings.biometricLockEnabled &&
-              remoteSettings.passcodeHash
+              remoteSettings.hasPasscode
             ) {
               setAppLocked(true);
             }
@@ -933,7 +938,7 @@ export default function App() {
           </div>
         )}
 
-        {appLocked && !showSplash && settings.passcodeHash && (
+        {appLocked && !showSplash && settings.hasPasscode && (
           <PasscodeLockScreen
             mode="unlock"
             user={{

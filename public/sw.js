@@ -1,7 +1,5 @@
-const CACHE_NAME = 'handover-pwa-v3';
+const CACHE_NAME = 'handover-pwa-__SW_CACHE_VERSION__';
 const PRECACHE_ASSETS = [
-  '/',
-  '/index.html',
   '/manifest.webmanifest',
   '/icon-192.png',
   '/icon-512.png',
@@ -19,10 +17,18 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(
+        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
+      )
     )
   );
   self.clients.claim();
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', (event) => {
@@ -31,36 +37,58 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Stale-while-revalidate for navigations so PWA cold launch paints instantaneously from cache
-  if (event.request.mode === 'navigate') {
+  // Never serve stale sw.js
+  if (url.pathname === '/sw.js') {
+    event.respondWith(fetch(event.request, { cache: 'no-store' }));
+    return;
+  }
+
+  // Network-first for HTML navigations so deployed updates arrive automatically
+  if (event.request.mode === 'navigate' || url.pathname === '/index.html') {
     event.respondWith(
-      caches.match('/index.html').then((cached) => {
-        const networkUpdate = fetch(event.request)
-          .then((response) => {
-            if (response.ok) {
-              const clone = response.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone));
-            }
-            return response;
-          })
-          .catch(() => cached);
-        return cached || networkUpdate;
-      })
+      fetch(event.request, { cache: 'no-store' })
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match('/index.html'))
     );
     return;
   }
 
+  // Content-hashed bundle assets can safely be served cache-first
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      caches.match(event.request).then(
+        (cached) =>
+          cached ||
+          fetch(event.request).then((response) => {
+            if (response.ok) {
+              const clone = response.clone();
+              caches
+                .open(CACHE_NAME)
+                .then((cache) => cache.put(event.request, clone));
+            }
+            return response;
+          })
+      )
+    );
+    return;
+  }
+
+  // Network-first fallback for icons/manifest so branding updates propagate
   event.respondWith(
-    caches.match(event.request).then(
-      (cached) =>
-        cached ||
-        fetch(event.request).then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-    )
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });

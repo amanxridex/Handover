@@ -1,5 +1,6 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { setHapticsEnabled } from '../utils/nativeBridge';
+import { getStoredSessionToken } from './profileService';
 
 const SETTINGS_STORAGE_KEY = 'handover_settings_v1';
 
@@ -7,6 +8,7 @@ export const DEFAULT_SETTINGS = {
   planTier: 'free', // free | pro | founder_pro
   hapticsEnabled: true,
   biometricLockEnabled: false,
+  hasPasscode: false,
   passcodeHash: '',
   biometricCredentialId: '',
   notificationsEnabled: true,
@@ -21,7 +23,12 @@ function readLocalSettings() {
   try {
     const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
     if (!raw) return { ...DEFAULT_SETTINGS };
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    return {
+      ...DEFAULT_SETTINGS,
+      ...parsed,
+      hasPasscode: Boolean(parsed.hasPasscode || parsed.passcodeHash),
+    };
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
@@ -51,7 +58,7 @@ export function clearStoredSettings() {
   setHapticsEnabled(true);
 }
 
-// Hash 4-digit passcode safely across HTTP & HTTPS
+// Local offline fallback PIN hash (used only if Supabase is unconfigured)
 export async function hashPasscode(pin) {
   const clean = String(pin || '').trim();
   const input = `handover:pin:v1:${clean}`;
@@ -62,7 +69,6 @@ export async function hashPasscode(pin) {
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
   }
-  // Fallback deterministic multi-round hash when subtle crypto is unavailable
   let h1 = 0x811c9dc5;
   let h2 = 0x9e3779b9;
   for (let i = 0; i < input.length; i += 1) {
@@ -74,12 +80,25 @@ export async function hashPasscode(pin) {
 }
 
 export async function verifyPasscode(pin, storedHash) {
+  const token = getStoredSessionToken();
+  if (isSupabaseConfigured && supabase && token) {
+    try {
+      const { data, error } = await supabase.rpc('verify_authenticated_passcode', {
+        p_session_token: token,
+        p_passcode: String(pin || ''),
+      });
+      if (!error && typeof data === 'boolean') {
+        return data;
+      }
+    } catch {
+      // Fall through to local hash only on network failure
+    }
+  }
   if (!storedHash) return false;
   const computed = await hashPasscode(pin);
   return computed === storedHash;
 }
 
-// Check platform authenticator availability (Face ID / Touch ID / Windows Hello)
 export async function isPlatformBiometricAvailable() {
   if (
     typeof window === 'undefined' ||
@@ -175,53 +194,51 @@ export async function verifyBiometricPasskey(credentialId) {
 
 export async function fetchUserSettings(profileId) {
   const local = readLocalSettings();
-  if (!profileId || !isSupabaseConfigured || !supabase) {
+  const token = getStoredSessionToken();
+  if (!profileId || !token || !isSupabaseConfigured || !supabase) {
     return local;
   }
   try {
-    const { data, error } = await supabase
-      .from('user_settings')
-      .select(
-        'plan_tier, haptics_enabled, biometric_lock_enabled, passcode_hash, notifications_enabled, private_account, autoplay_media, show_activity, show_badges, language'
-      )
-      .eq('profile_id', profileId)
-      .maybeSingle();
+    const { data, error } = await supabase.rpc('get_authenticated_settings', {
+      p_session_token: token,
+    });
 
-    if (error || !data) return local;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (error || !row) return local;
 
     const merged = {
       ...local,
-      planTier: data.plan_tier || local.planTier,
+      planTier: row.plan_tier || local.planTier,
       hapticsEnabled:
-        typeof data.haptics_enabled === 'boolean'
-          ? data.haptics_enabled
+        typeof row.haptics_enabled === 'boolean'
+          ? row.haptics_enabled
           : local.hapticsEnabled,
       biometricLockEnabled:
-        typeof data.biometric_lock_enabled === 'boolean'
-          ? data.biometric_lock_enabled
+        typeof row.biometric_lock_enabled === 'boolean'
+          ? row.biometric_lock_enabled
           : local.biometricLockEnabled,
-      passcodeHash: data.passcode_hash || local.passcodeHash || '',
+      hasPasscode: Boolean(row.has_passcode),
       notificationsEnabled:
-        typeof data.notifications_enabled === 'boolean'
-          ? data.notifications_enabled
+        typeof row.notifications_enabled === 'boolean'
+          ? row.notifications_enabled
           : local.notificationsEnabled,
       privateAccount:
-        typeof data.private_account === 'boolean'
-          ? data.private_account
+        typeof row.private_account === 'boolean'
+          ? row.private_account
           : local.privateAccount,
       autoplayMedia:
-        typeof data.autoplay_media === 'boolean'
-          ? data.autoplay_media
+        typeof row.autoplay_media === 'boolean'
+          ? row.autoplay_media
           : local.autoplayMedia,
       showActivity:
-        typeof data.show_activity === 'boolean'
-          ? data.show_activity
+        typeof row.show_activity === 'boolean'
+          ? row.show_activity
           : local.showActivity,
       showBadges:
-        typeof data.show_badges === 'boolean'
-          ? data.show_badges
+        typeof row.show_badges === 'boolean'
+          ? row.show_badges
           : local.showBadges,
-      language: data.language || local.language,
+      language: row.language || local.language,
     };
     writeLocalSettings(merged);
     return merged;
@@ -231,30 +248,46 @@ export async function fetchUserSettings(profileId) {
 }
 
 export async function saveUserSettings(profileId, patch) {
-  const next = { ...readLocalSettings(), ...patch };
+  const { newPasscode, clearPasscode, ...cleanPatch } = patch;
+  const current = readLocalSettings();
+  const next = {
+    ...current,
+    ...cleanPatch,
+    hasPasscode: clearPasscode
+      ? false
+      : newPasscode
+        ? true
+        : Boolean(cleanPatch.hasPasscode ?? current.hasPasscode),
+  };
+
+  if (newPasscode && !isSupabaseConfigured) {
+    next.passcodeHash = await hashPasscode(newPasscode);
+  } else if (clearPasscode) {
+    next.passcodeHash = '';
+  }
+
   writeLocalSettings(next);
 
-  if (!profileId || !isSupabaseConfigured || !supabase) {
+  const token = getStoredSessionToken();
+  if (!profileId || !token || !isSupabaseConfigured || !supabase) {
     return next;
   }
 
   try {
-    await supabase.from('user_settings').upsert(
-      {
-        profile_id: profileId,
-        plan_tier: next.planTier,
-        haptics_enabled: Boolean(next.hapticsEnabled),
-        biometric_lock_enabled: Boolean(next.biometricLockEnabled),
-        passcode_hash: next.passcodeHash || null,
-        notifications_enabled: Boolean(next.notificationsEnabled),
-        private_account: Boolean(next.privateAccount),
-        autoplay_media: Boolean(next.autoplayMedia),
-        show_activity: Boolean(next.showActivity),
-        show_badges: Boolean(next.showBadges),
-        language: next.language || 'English',
-      },
-      { onConflict: 'profile_id' }
-    );
+    await supabase.rpc('save_authenticated_settings', {
+      p_session_token: token,
+      p_plan_tier: next.planTier,
+      p_haptics_enabled: Boolean(next.hapticsEnabled),
+      p_biometric_lock_enabled: Boolean(next.biometricLockEnabled),
+      p_new_passcode: newPasscode || null,
+      p_clear_passcode: Boolean(clearPasscode),
+      p_notifications_enabled: Boolean(next.notificationsEnabled),
+      p_private_account: Boolean(next.privateAccount),
+      p_autoplay_media: Boolean(next.autoplayMedia),
+      p_show_activity: Boolean(next.showActivity),
+      p_show_badges: Boolean(next.showBadges),
+      p_language: next.language || 'English',
+    });
   } catch {
     // Keep local settings even when offline
   }
@@ -264,27 +297,27 @@ export async function saveUserSettings(profileId, patch) {
 
 export async function updateProfileDetailsInDb(
   profileId,
-  { fullName, bio, avatarUrl, companyName, companyLogoUrl }
+  { fullName, bio, avatarUrl, companyName }
 ) {
+  const token = getStoredSessionToken();
   if (!profileId || !isSupabaseConfigured || !supabase) {
     return { ok: true };
   }
+  if (!token) {
+    return { ok: false, error: 'Session expired. Please sign in again.' };
+  }
   try {
-    const updatePayload = {};
-    if (fullName !== undefined) updatePayload.full_name = fullName;
-    if (bio !== undefined) updatePayload.bio = bio;
-    if (avatarUrl !== undefined) updatePayload.avatar_url = avatarUrl;
-    if (companyName !== undefined) updatePayload.company_name = companyName;
-    if (companyLogoUrl !== undefined) {
-      updatePayload.company_logo_url = companyLogoUrl;
+    const { data, error } = await supabase.rpc('update_authenticated_profile', {
+      p_session_token: token,
+      p_full_name: fullName ?? null,
+      p_bio: bio ?? null,
+      p_avatar_url: avatarUrl ?? null,
+      p_company_name: companyName ?? null,
+    });
+    if (error || data === false) {
+      return { ok: false, error: 'Session invalid or expired' };
     }
-
-    const { error } = await supabase
-      .from('profiles')
-      .update(updatePayload)
-      .eq('id', profileId);
-
-    return { ok: !error, error: error?.message };
+    return { ok: true };
   } catch (err) {
     return { ok: false, error: err?.message || 'Failed to update profile' };
   }

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import avatarDefault from '../assets/avatar-default.jpg';
 import {
-  hashPasscode,
   verifyBiometricPasskey,
   verifyPasscode,
 } from '../services/settingsService';
@@ -93,9 +92,8 @@ export default function PasscodeLockScreen({
       return;
     }
 
-    const hashed = await hashPasscode(nextPin);
     triggerSuccessHaptic(true);
-    onPasscodeSet?.(hashed);
+    onPasscodeSet?.(nextPin);
   };
 
   const handleBackspace = () => {
