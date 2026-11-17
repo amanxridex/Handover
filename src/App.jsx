@@ -45,6 +45,7 @@ import {
   getStoredOnboardingState,
   persistLocalProfile,
   saveOnboardedProfile,
+  searchProfilesByName,
   syncProfileFromSupabase,
 } from './services/profileService';
 import {
@@ -55,16 +56,6 @@ import {
   saveUserSettings,
 } from './services/settingsService';
 import { triggerLightHaptic } from './utils/nativeBridge';
-
-const SEARCHABLE_BRANDS = [
-  { name: 'Waitrose', category: 'Grocery', rate: '3× miles' },
-  { name: 'PlayStation Store', category: 'Retail', rate: '4× miles' },
-  { name: 'Ticketmaster Live', category: 'Retail', rate: '2× miles' },
-  { name: 'Wagamama', category: 'Dining', rate: '5× miles' },
-  { name: 'John Lewis', category: 'Retail', rate: '4× miles' },
-  { name: 'Sephora', category: 'Beauty', rate: '6× miles' },
-  { name: 'Shell', category: 'Fuel', rate: '2× miles' },
-];
 
 const INITIAL_NOTIFICATIONS = [
   {
@@ -292,6 +283,9 @@ export default function App() {
   );
   const [activeTab, setActiveTab] = useState(initialRouteSnap.activeTab);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchedUsers, setSearchedUsers] = useState([]);
+  const [searchingUsers, setSearchingUsers] = useState(false);
+  const [selectedSearchUser, setSelectedSearchUser] = useState(null);
   const [selectedUser, setSelectedUser] = useState(
     initialStored?.setupData?.name
       ? { ...USER_PROFILES[0], name: initialStored.setupData.name }
@@ -533,15 +527,33 @@ export default function App() {
 
   const activePromo = PROMO_BY_CATEGORY.All;
 
-  const filteredBrands = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return [];
-    return SEARCHABLE_BRANDS.filter(
-      (b) =>
-        b.name.toLowerCase().includes(q) ||
-        b.category.toLowerCase().includes(q)
-    );
-  }, [searchQuery]);
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setSearchedUsers([]);
+      setSearchingUsers(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSearchingUsers(true);
+    const timer = setTimeout(() => {
+      searchProfilesByName({
+        query: trimmed,
+        excludeProfileId: profileId,
+        excludeUsername: setupData.username,
+      }).then((rows) => {
+        if (cancelled) return;
+        setSearchedUsers(rows);
+        setSearchingUsers(false);
+      });
+    }, 180);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchQuery, profileId, setupData.username]);
 
   const goBackInHistory = useCallback(() => {
     triggerLightHaptic();
@@ -1084,7 +1096,7 @@ export default function App() {
 
                 <label
                   className="search-box top-search-box"
-                  aria-label="Search brands, shops or services"
+                  aria-label="Search people by name or username"
                 >
                   <SearchIcon />
                   <input
@@ -1092,7 +1104,7 @@ export default function App() {
                     className="search-input"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search brands, shops or services"
+                    placeholder="Search people by name or @username"
                   />
                 </label>
               </header>
@@ -1114,7 +1126,13 @@ export default function App() {
                 {searchQuery.trim() && (
                   <div className="search-results-sheet" role="region" aria-label="Search results">
                     <div className="search-results-header">
-                      <span>{filteredBrands.length} matching partners</span>
+                      <span>
+                        {searchingUsers
+                          ? 'Searching...'
+                          : `${searchedUsers.length} matching ${
+                              searchedUsers.length === 1 ? 'person' : 'people'
+                            }`}
+                      </span>
                       <button
                         type="button"
                         className="clear-search-btn"
@@ -1123,19 +1141,45 @@ export default function App() {
                         Clear
                       </button>
                     </div>
-                    {filteredBrands.length > 0 ? (
-                      filteredBrands.map((brand) => (
-                        <div key={brand.name} className="search-result-row">
-                          <div>
-                            <div className="search-result-brand">{brand.name}</div>
-                            <div className="search-result-cat">{brand.category}</div>
+                    {searchingUsers && searchedUsers.length === 0 ? (
+                      <div className="search-result-cat">Searching users...</div>
+                    ) : searchedUsers.length > 0 ? (
+                      searchedUsers.map((person) => (
+                        <button
+                          key={person.id}
+                          type="button"
+                          className="search-result-row search-user-row"
+                          onClick={() => {
+                            triggerLightHaptic();
+                            setSelectedSearchUser(person);
+                          }}
+                        >
+                          <div className="search-user-left">
+                            <img
+                              src={person.avatar || avatarDefault}
+                              alt={person.fullName}
+                              className="search-user-avatar"
+                            />
+                            <div className="search-user-meta">
+                              <div className="search-result-brand">
+                                {person.fullName}
+                              </div>
+                              <div className="search-result-cat">
+                                @{person.username}
+                                {person.companyName
+                                  ? ` · ${person.companyName}`
+                                  : ''}
+                              </div>
+                            </div>
                           </div>
-                          <span className="search-result-rate">{brand.rate}</span>
-                        </div>
+                          <span className="search-result-rate">
+                            {person.role === 'founder' ? 'Founder' : 'Creator'}
+                          </span>
+                        </button>
                       ))
                     ) : (
                       <div className="search-result-cat">
-                        No partners matched &ldquo;{searchQuery}&rdquo;.
+                        No people matched &ldquo;{searchQuery}&rdquo;.
                       </div>
                     )}
                   </div>
@@ -1168,6 +1212,72 @@ export default function App() {
                 onSelectTab={handleTabSelect}
               />
             </div>
+
+            {selectedSearchUser && (
+              <div
+                className="founders-modal-backdrop"
+                role="dialog"
+                aria-modal="true"
+                aria-label={selectedSearchUser.fullName}
+                onClick={() => setSelectedSearchUser(null)}
+              >
+                <div
+                  className="founders-modal-sheet"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="founders-modal-head">
+                    <img
+                      src={selectedSearchUser.avatar || avatarDefault}
+                      alt={selectedSearchUser.fullName}
+                      className="founders-modal-thumb"
+                    />
+                    <div>
+                      <h2 className="founders-modal-title">
+                        {selectedSearchUser.fullName}
+                      </h2>
+                      <p className="founders-modal-sub">
+                        @{selectedSearchUser.username}
+                        {selectedSearchUser.companyName
+                          ? ` · ${selectedSearchUser.companyName}`
+                          : ''}
+                      </p>
+                      <p className="founders-modal-sector">
+                        {selectedSearchUser.role === 'founder'
+                          ? selectedSearchUser.sector || 'Founder'
+                          : (selectedSearchUser.contentTypes || ['Creator']).join(' · ')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {selectedSearchUser.bio && (
+                    <p className="founders-modal-pitch">
+                      {selectedSearchUser.bio}
+                    </p>
+                  )}
+
+                  <div className="founders-modal-actions">
+                    <button
+                      type="button"
+                      className="founders-modal-secondary"
+                      onClick={() => setSelectedSearchUser(null)}
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      className="founders-modal-primary"
+                      onClick={() => {
+                        triggerLightHaptic();
+                        setSelectedSearchUser(null);
+                        handleTabSelect('chat');
+                      }}
+                    >
+                      Message
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
         </div>

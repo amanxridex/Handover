@@ -316,3 +316,70 @@ export async function syncProfileFromSupabase(stored) {
     return { valid: true, profile: stored };
   }
 }
+
+export async function searchProfilesByName({
+  query,
+  excludeProfileId,
+  excludeUsername,
+} = {}) {
+  const sanitized = String(query || '')
+    .trim()
+    .replace(/[,()%_*]/g, '')
+    .replace(/^@+/, '');
+
+  if (!sanitized || !isSupabaseConfigured || !supabase) {
+    return [];
+  }
+
+  const selfUsername = String(excludeUsername || '')
+    .trim()
+    .toLowerCase();
+
+  try {
+    let req = supabase
+      .from('profiles')
+      .select(
+        'id, full_name, username, avatar_url, role, company_name, sector, company_pitch, bio, content_types'
+      )
+      .eq('onboarding_completed', true)
+      .or(
+        `full_name.ilike.%${sanitized}%,username.ilike.%${sanitized}%,company_name.ilike.%${sanitized}%`
+      )
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (excludeProfileId) {
+      req = req.neq('id', excludeProfileId);
+    }
+
+    const { data, error } = await req;
+    if (error || !Array.isArray(data)) {
+      return [];
+    }
+
+    return data
+      .filter((row) => {
+        if (excludeProfileId && row.id === excludeProfileId) return false;
+        if (
+          selfUsername &&
+          String(row.username || '').trim().toLowerCase() === selfUsername
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .map((row) => ({
+        id: row.id,
+        fullName: row.full_name || 'Handover Member',
+        username: row.username || 'member',
+        avatar: row.avatar_url || '',
+        role: row.role || 'creator',
+        companyName: row.company_name || '',
+        sector: row.sector || '',
+        bio: row.bio || row.company_pitch || '',
+        contentTypes: Array.isArray(row.content_types) ? row.content_types : [],
+      }));
+  } catch {
+    return [];
+  }
+}
