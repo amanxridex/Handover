@@ -27,6 +27,8 @@ import ChatScreen from './components/ChatScreen';
 import BottomNav from './components/BottomNav';
 import BrandDealDetailScreen from './components/BrandDealDetailScreen';
 import BrandDealsScreen from './components/BrandDealsScreen';
+import CreateBrandDealScreen from './components/CreateBrandDealScreen';
+import CreatePostScreen from './components/CreatePostScreen';
 import CreatorsScreen from './components/CreatorsScreen';
 import FoundersScreen from './components/FoundersScreen';
 import HomeFeedScreen from './components/HomeFeedScreen';
@@ -146,6 +148,8 @@ function routeForSnapshot(snap) {
     return '/onboarding/role';
   }
   if (snap.activeTab === 'home') {
+    if (snap.createPage === 'post') return '/create-post';
+    if (snap.createPage === 'deal') return '/create-deal';
     if (snap.foundersOpen) return '/founders';
     if (snap.creatorsOpen) return '/creators';
     if (snap.notificationsOpen) return '/notifications';
@@ -183,6 +187,7 @@ function snapshotFromPathname(pathname, alreadyOnboarded) {
     notificationsOpen: false,
     foundersOpen: false,
     creatorsOpen: false,
+    createPage: null,
     settingsOpen: false,
   };
   if (!alreadyOnboarded) {
@@ -195,6 +200,12 @@ function snapshotFromPathname(pathname, alreadyOnboarded) {
     if (path === '/onboarding/founder/details') return { ...base, flowStep: 'role', roleSubStep: 'founder-2' };
     if (path === '/onboarding/creator') return { ...base, flowStep: 'role', roleSubStep: 'creator-1' };
     return base;
+  }
+  if (path === '/create-post') {
+    return { ...base, flowStep: 'main', activeTab: 'home', createPage: 'post' };
+  }
+  if (path === '/create-deal') {
+    return { ...base, flowStep: 'main', activeTab: 'home', createPage: 'deal' };
   }
   if (path === '/founders') {
     return { ...base, flowStep: 'main', activeTab: 'home', foundersOpen: true };
@@ -309,6 +320,9 @@ export default function App() {
   const [creatorsOpen, setCreatorsOpen] = useState(
     Boolean(initialRouteSnap.creatorsOpen)
   );
+  const [createPage, setCreatePage] = useState(
+    initialRouteSnap.createPage || null
+  );
   const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
   const [exitHint, setExitHint] = useState(false);
   const [transitionMode, setTransitionMode] = useState('none'); // none | push | pop | tab-right | tab-left
@@ -336,6 +350,7 @@ export default function App() {
       notificationsOpen,
       foundersOpen,
       creatorsOpen,
+      createPage,
       settingsOpen,
     }),
     [
@@ -350,6 +365,7 @@ export default function App() {
       notificationsOpen,
       foundersOpen,
       creatorsOpen,
+      createPage,
       settingsOpen,
     ]
   );
@@ -462,6 +478,7 @@ export default function App() {
         setNotificationsOpen(Boolean(target.notificationsOpen));
         setFoundersOpen(Boolean(target.foundersOpen));
         setCreatorsOpen(Boolean(target.creatorsOpen));
+        setCreatePage(target.createPage || null);
         setSettingsOpen(Boolean(target.settingsOpen));
         return;
       }
@@ -488,6 +505,7 @@ export default function App() {
         notificationsOpen,
         foundersOpen,
         creatorsOpen,
+        createPage,
         settingsOpen,
       };
       window.history.pushState(
@@ -511,6 +529,7 @@ export default function App() {
     notificationsOpen,
     foundersOpen,
     creatorsOpen,
+    createPage,
     settingsOpen,
   ]);
 
@@ -625,6 +644,7 @@ export default function App() {
     setSelectedDealId(null);
     setFoundersOpen(false);
     setCreatorsOpen(false);
+    setCreatePage(null);
     setNotificationsOpen(false);
     setActiveChatId(null);
     setActiveCommentsPostId(null);
@@ -688,6 +708,7 @@ export default function App() {
     setSelectedDealObj(null);
     setFoundersOpen(false);
     setCreatorsOpen(false);
+    setCreatePage(null);
     setNotificationsOpen(false);
     setActiveChatId(null);
     setActiveCommentsPostId(null);
@@ -760,8 +781,12 @@ export default function App() {
         : flowStep
       : activeTab === 'profile' && settingsOpen
         ? 'settings'
-        : activeTab === 'home' && foundersOpen
-          ? 'founders'
+        : activeTab === 'home' && createPage === 'post'
+          ? 'create-post'
+          : activeTab === 'home' && createPage === 'deal'
+            ? 'create-deal'
+            : activeTab === 'home' && foundersOpen
+              ? 'founders'
           : activeTab === 'home' && creatorsOpen
             ? 'creators'
             : activeTab === 'home' && notificationsOpen
@@ -884,6 +909,43 @@ export default function App() {
             activeTab={activeTab}
             onSelectTab={handleTabSelect}
           />
+        ) : activeTab === 'home' && createPage === 'post' ? (
+          <CreatePostScreen
+            currentUser={{
+              id: profileId,
+              name: selectedUser.name,
+              username: setupData.username,
+              avatar: setupData.avatar,
+              role: roleDetails?.role || '',
+              companyName: roleDetails?.companyName || '',
+              companyLogoUrl: roleDetails?.companyLogoUrl || '',
+            }}
+            onBack={goBackInHistory}
+            onPublished={() => {
+              goBackInHistory();
+            }}
+          />
+        ) : activeTab === 'home' && createPage === 'deal' ? (
+          <CreateBrandDealScreen
+            currentUser={{
+              id: profileId,
+              name: selectedUser.name,
+              username: setupData.username,
+              avatar: setupData.avatar,
+              role: roleDetails?.role || '',
+              companyName: roleDetails?.companyName || '',
+              companyLogoUrl: roleDetails?.companyLogoUrl || '',
+            }}
+            onBack={goBackInHistory}
+            onPublished={(createdDeal) => {
+              setCreatePage(null);
+              setTransitionMode('push');
+              setSelectedDealObj(createdDeal || null);
+              setSelectedDealId(createdDeal?.id || null);
+              setBrandDealsOpen(true);
+              setActiveTab('search');
+            }}
+          />
         ) : activeTab === 'home' && foundersOpen ? (
           <FoundersScreen
             onBack={goBackInHistory}
@@ -955,6 +1017,14 @@ export default function App() {
             onOpenCreators={() => {
               setTransitionMode('push');
               setCreatorsOpen(true);
+            }}
+            onOpenCreatePost={() => {
+              setTransitionMode('push');
+              setCreatePage('post');
+            }}
+            onOpenCreateDeal={() => {
+              setTransitionMode('push');
+              setCreatePage('deal');
             }}
             onOpenProfile={() => handleTabSelect('profile')}
             activeCommentsPostId={activeCommentsPostId}

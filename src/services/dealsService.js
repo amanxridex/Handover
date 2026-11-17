@@ -41,11 +41,15 @@ function mapDbDealRow(row) {
   const deliverables = Array.isArray(row.deliverables)
     ? row.deliverables.map(String)
     : [];
+  const minRequirements = Array.isArray(row.min_requirements)
+    ? row.min_requirements.map(String).filter(Boolean)
+    : [];
   return {
     id: row.id,
     brandName: row.brand_name,
     category: row.category,
     logoKey: row.logo_key,
+    brandLogoUrl: row.brand_logo_url || '',
     paymentAmount: row.payment_amount,
     paymentCents: row.payment_cents || 0,
     currency: row.currency || 'USD',
@@ -58,6 +62,8 @@ function mapDbDealRow(row) {
           '2x Story frames with official campaign tag',
           'Direct payout upon content approval',
         ],
+    minRequirements,
+    brief: row.brief || '',
     payoutTerms:
       row.payout_terms ||
       `Single payment of ${row.payment_amount} upon campaign completion`,
@@ -112,7 +118,7 @@ export async function fetchBrandDeals() {
     const { data, error } = await supabase
       .from('brand_deals')
       .select(
-        'id, brand_name, category, logo_key, payment_amount, payment_cents, currency, headline, subtitle, deliverables, payout_terms, sort_order'
+        'id, brand_name, category, logo_key, brand_logo_url, payment_amount, payment_cents, currency, headline, subtitle, deliverables, min_requirements, brief, payout_terms, sort_order'
       )
       .eq('is_active', true)
       .order('created_at', { ascending: false })
@@ -139,7 +145,7 @@ export async function fetchBrandDealById(dealId) {
     const { data, error } = await supabase
       .from('brand_deals')
       .select(
-        'id, brand_name, category, logo_key, payment_amount, payment_cents, currency, headline, subtitle, deliverables, payout_terms, sort_order'
+        'id, brand_name, category, logo_key, brand_logo_url, payment_amount, payment_cents, currency, headline, subtitle, deliverables, min_requirements, brief, payout_terms, sort_order'
       )
       .eq('id', dealId)
       .eq('is_active', true)
@@ -252,5 +258,62 @@ export async function withdrawBrandDealApplication(dealId) {
     return { ok: true, applications: current };
   } catch {
     return { ok: false, applications: current };
+  }
+}
+
+export async function createBrandDeal({
+  brandName,
+  category,
+  headline,
+  subtitle,
+  objectives,
+  minRequirements,
+  brief,
+  paymentAmount,
+  brandLogoUrl,
+}) {
+  const cleanBrand = String(brandName || '').trim();
+  const numericAmount = Number(String(paymentAmount || '').replace(/[^0-9.]/g, ''));
+  if (!cleanBrand || !numericAmount || numericAmount <= 0) {
+    return { ok: false, error: 'Enter a brand name and valid payment amount.' };
+  }
+
+  const formattedAmount = `$${Math.round(numericAmount).toLocaleString('en-US')}`;
+  const paymentCents = Math.round(numericAmount * 100);
+  const cleanObjectives = (objectives || []).map((s) => String(s || '').trim()).filter(Boolean);
+  const cleanReqs = (minRequirements || []).map((s) => String(s || '').trim()).filter(Boolean);
+  const cleanBrief = String(brief || '').trim();
+  const cleanCat = String(category || 'Tech').trim();
+
+  const sessionToken = getStoredSessionToken();
+  if (!isSupabaseConfigured || !supabase || !sessionToken) {
+    return { ok: false, error: 'Sign in required to publish a brand deal.' };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('create_brand_deal', {
+      p_session_token: sessionToken,
+      p_brand_name: cleanBrand,
+      p_category: cleanCat,
+      p_payment_amount: formattedAmount,
+      p_payment_cents: paymentCents,
+      p_headline: headline?.trim() || `${cleanBrand} Creator Offer`,
+      p_subtitle: subtitle?.trim() || `${cleanCat} Campaign · Creator Collab`,
+      p_deliverables: cleanObjectives,
+      p_min_requirements: cleanReqs,
+      p_brief: cleanBrief,
+      p_brand_logo_url: brandLogoUrl || null,
+    });
+
+    if (error || !data?.ok) {
+      return {
+        ok: false,
+        error: data?.error || error?.message || 'Could not publish brand deal.',
+      };
+    }
+
+    return { ok: true, deal: data.deal };
+  } catch (err) {
+    return { ok: false, error: err?.message || 'Network error.' };
   }
 }

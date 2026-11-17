@@ -10,13 +10,11 @@ import handoverMarkBlue from '../assets/logos/handover-mark-blue.jpg';
 import handoverMark from '../assets/logos/handover-mark.png';
 import profileHero from '../assets/profile-hero.jpg';
 import {
-  createFeedPost,
   fetchFeedEngagement,
   fetchFeedPosts,
   getClientActorKey,
   togglePostLikeInDb,
 } from '../services/feedService';
-import { compressImageFile } from '../utils/imageCompress';
 import { triggerLightHaptic, triggerSuccessHaptic } from '../utils/nativeBridge';
 import BottomNav from './BottomNav';
 import CommentsDrawer from './CommentsDrawer';
@@ -100,6 +98,8 @@ export default function HomeFeedScreen({
   onOpenNotifications,
   onOpenFounders,
   onOpenCreators,
+  onOpenCreatePost,
+  onOpenCreateDeal,
   onOpenProfile,
   activeCommentsPostId,
   onOpenComments,
@@ -108,7 +108,6 @@ export default function HomeFeedScreen({
   activeTab,
   onSelectTab,
 }) {
-  const fileInputRef = useRef(null);
   const feedScrollRef = useRef(null);
   const feedMenuRef = useRef(null);
   const pullStartYRef = useRef(null);
@@ -124,10 +123,8 @@ export default function HomeFeedScreen({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshDone, setRefreshDone] = useState(false);
 
-  // Create Post sheet state
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newHeadline, setNewHeadline] = useState('');
-  const [newImage, setNewImage] = useState('');
+  // Two-card chooser drawer opened from the top-left H badge
+  const [createChooserOpen, setCreateChooserOpen] = useState(false);
 
   const actorKey = useMemo(
     () => getClientActorKey(currentUser?.id),
@@ -213,7 +210,7 @@ export default function HomeFeedScreen({
     try {
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistration().then((reg) => {
-          reg?.update().catch(() => {});
+          reg?.update().catch(() => { });
           if (reg?.waiting) {
             reg.waiting.postMessage('SKIP_WAITING');
           }
@@ -235,7 +232,7 @@ export default function HomeFeedScreen({
   };
 
   const handleTouchStart = (e) => {
-    if (isRefreshing || createOpen || activeCommentsPostId) return;
+    if (isRefreshing || createChooserOpen || activeCommentsPostId) return;
     const scroller = feedScrollRef.current;
     if (!scroller || scroller.scrollTop > 2) {
       pullStartYRef.current = null;
@@ -325,77 +322,6 @@ export default function HomeFeedScreen({
     [activeCommentsPostId, posts]
   );
 
-  const handlePostPhotoChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const compressed = await compressImageFile(file, 1440, 0.9);
-    if (compressed) {
-      setNewImage(compressed);
-    }
-    e.target.value = '';
-  };
-
-  const handlePublishPost = async (e) => {
-    e.preventDefault();
-    const headline = newHeadline.trim();
-    if (!headline) {
-      showNotice('Write a headline for your post');
-      return;
-    }
-    triggerLightHaptic();
-    const displayName =
-      currentUser?.name?.trim() ||
-      currentUser?.username?.trim() ||
-      'Handover Member';
-    const rawUsername = currentUser?.username?.trim() || '';
-    const handle = rawUsername
-      ? `@${rawUsername}`
-      : `@${displayName.toLowerCase().replace(/[^a-z0-9]/g, '') || 'you'}`;
-    const optimisticId = `post-${Date.now()}`;
-    const draftPost = {
-      id: optimisticId,
-      authorName: displayName,
-      authorHandle: handle,
-      authorRole: currentUser?.role || 'creator',
-      companyName: currentUser?.companyName || '',
-      companyLogoUrl: currentUser?.companyLogoUrl || '',
-      time: 'Just now',
-      avatar: currentUser?.avatar || avatarDefault,
-      headline,
-      image: newImage || feedWarmPost,
-      likesCount: 0,
-      commentsCount: 0,
-      liked: false,
-    };
-    setPosts((prev) => [draftPost, ...prev]);
-    setNewHeadline('');
-    setNewImage('');
-    setCreateOpen(false);
-
-    const { post: saved, error } = await createFeedPost({
-      authorId: currentUser?.id || null,
-      authorName: draftPost.authorName,
-      authorHandle: draftPost.authorHandle,
-      avatar: draftPost.avatar,
-      authorRole: draftPost.authorRole,
-      companyName: draftPost.companyName,
-      companyLogoUrl: draftPost.companyLogoUrl,
-      headline: draftPost.headline,
-      image: draftPost.image,
-      likesCount: 0,
-      liked: false,
-    });
-    if (saved?.id) {
-      setPosts((prev) =>
-        prev.map((p) => (p.id === optimisticId ? saved : p))
-      );
-      showNotice('Post published!');
-    } else {
-      setPosts((prev) => prev.filter((p) => p.id !== optimisticId));
-      showNotice(error || 'Could not save post to database');
-    }
-  };
-
   const pullProgress = Math.min(1, pullDistance / PULL_THRESHOLD);
   const ptrVisible = pullDistance > 4 || isRefreshing || refreshDone;
   const arcCircumference = 2 * Math.PI * 12;
@@ -419,9 +345,8 @@ export default function HomeFeedScreen({
       {/* Kinetic Ring Pull-to-Refresh Indicator */}
       {ptrVisible && (
         <div
-          className={`feed-ptr-stage ${isRefreshing ? 'is-refreshing' : ''} ${
-            refreshDone ? 'is-done' : ''
-          } ${pullDistance >= PULL_THRESHOLD ? 'is-ready' : ''}`}
+          className={`feed-ptr-stage ${isRefreshing ? 'is-refreshing' : ''} ${refreshDone ? 'is-done' : ''
+            } ${pullDistance >= PULL_THRESHOLD ? 'is-ready' : ''}`}
           style={{
             transform: `translate(-50%, ${Math.max(0, pullDistance * 0.45)}px)`,
             opacity: isRefreshing || refreshDone ? 1 : Math.min(1, pullProgress * 1.25),
@@ -437,10 +362,10 @@ export default function HomeFeedScreen({
               isRefreshing || refreshDone
                 ? undefined
                 : {
-                    transform: `scale(${0.68 + pullProgress * 0.38}) rotate(${Math.round(
-                      pullProgress * 220
-                    )}deg)`,
-                  }
+                  transform: `scale(${0.68 + pullProgress * 0.38}) rotate(${Math.round(
+                    pullProgress * 220
+                  )}deg)`,
+                }
             }
           >
             <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
@@ -495,11 +420,11 @@ export default function HomeFeedScreen({
         style={
           pullDistance > 0
             ? {
-                transform: `translateY(${pullDistance}px)`,
-                transition: pullStartYRef.current
-                  ? 'none'
-                  : 'transform 0.24s cubic-bezier(0.22, 1, 0.36, 1)',
-              }
+              transform: `translateY(${pullDistance}px)`,
+              transition: pullStartYRef.current
+                ? 'none'
+                : 'transform 0.24s cubic-bezier(0.22, 1, 0.36, 1)',
+            }
             : { transition: 'transform 0.24s cubic-bezier(0.22, 1, 0.36, 1)' }
         }
       >
@@ -510,9 +435,9 @@ export default function HomeFeedScreen({
             className="feed-logo-badge"
             onClick={() => {
               triggerLightHaptic();
-              setCreateOpen(true);
+              setCreateChooserOpen(true);
             }}
-            aria-label="Create post"
+            aria-label="Create post or brand deal"
           >
             <img
               src={handoverMark}
@@ -542,9 +467,8 @@ export default function HomeFeedScreen({
                     key={mode}
                     type="button"
                     role="menuitem"
-                    className={`feed-mode-item ${
-                      feedMode === mode ? 'active' : ''
-                    }`}
+                    className={`feed-mode-item ${feedMode === mode ? 'active' : ''
+                      }`}
                     onClick={() => {
                       triggerLightHaptic();
                       setFeedMenuOpen(false);
@@ -590,9 +514,8 @@ export default function HomeFeedScreen({
               <button
                 key={capsule.id}
                 type="button"
-                className={`feed-story-capsule ${
-                  isSelected ? 'active' : ''
-                }`}
+                className={`feed-story-capsule ${isSelected ? 'active' : ''
+                  }`}
                 onClick={() => {
                   triggerLightHaptic();
                   setActiveCapsule(capsule.id);
@@ -719,68 +642,67 @@ export default function HomeFeedScreen({
         floating
       />
 
-      {/* Create Post Modal Sheet */}
-      {createOpen && (
+      {/* Two-Card Create Chooser Drawer */}
+      {createChooserOpen && (
         <div
           className="feed-create-backdrop"
           role="dialog"
           aria-modal="true"
-          aria-label="Create post"
-          onClick={() => setCreateOpen(false)}
+          aria-label="Create"
+          onClick={() => setCreateChooserOpen(false)}
         >
-          <form
+          <div
             className="feed-create-sheet"
             onClick={(e) => e.stopPropagation()}
-            onSubmit={handlePublishPost}
           >
             <div className="feed-create-header">
-              <h2 className="feed-create-title">Create post</h2>
+              <h2 className="feed-create-title">Create</h2>
               <button
                 type="button"
                 className="feed-create-close"
-                onClick={() => setCreateOpen(false)}
-                aria-label="Close create post"
+                onClick={() => setCreateChooserOpen(false)}
+                aria-label="Close create options"
               >
                 <CloseXIcon />
               </button>
             </div>
 
-            <textarea
-              className="setup-textarea feed-create-textarea"
-              rows={3}
-              placeholder="Write something cool to share..."
-              value={newHeadline}
-              onChange={(e) => setNewHeadline(e.target.value)}
-            />
+            <div className="create-chooser-grid">
+              <button
+                type="button"
+                className="create-chooser-card"
+                onClick={() => {
+                  triggerLightHaptic();
+                  setCreateChooserOpen(false);
+                  onOpenCreatePost?.();
+                }}
+              >
+                <span className="create-chooser-tag">Feed</span>
+                <div className="create-chooser-title">Create a post</div>
+                <p className="create-chooser-desc">
+                  Choose an image and write a post to share on the Handover feed.
+                </p>
+              </button>
 
-            <button
-              type="button"
-              className="feed-photo-picker"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {newImage ? (
-                <img
-                  src={newImage}
-                  alt="Selected post"
-                  className="feed-photo-preview"
-                />
-              ) : (
-                <span>+ Add a photo from your device</span>
-              )}
-            </button>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              onChange={handlePostPhotoChange}
-            />
-
-            <button type="submit" className="onboarding-next-btn">
-              <span className="onboarding-next-label">Post to Feed</span>
-            </button>
-          </form>
+              <button
+                type="button"
+                className="create-chooser-card is-deal"
+                onClick={() => {
+                  triggerLightHaptic();
+                  setCreateChooserOpen(false);
+                  onOpenCreateDeal?.();
+                }}
+              >
+                <span className="create-chooser-tag">Campaign</span>
+                <div className="create-chooser-title">
+                  Brand deal for creators
+                </div>
+                <p className="create-chooser-desc">
+                  Set 3 objectives, brief, 3 minimum requirements &amp; payment amount.
+                </p>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

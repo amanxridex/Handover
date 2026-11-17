@@ -7652,3 +7652,583 @@ button,
   background: #0b45dc;
   color: #ffffff;
 }
+
+/* ================================
+   Two-Card Create Chooser & Composer Pages
+================================ */
+.create-chooser-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.create-chooser-card {
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid rgba(147, 197, 253, 0.24);
+  background: #0b1c4a;
+  padding: 16px;
+  text-align: left;
+  color: #ffffff;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.14s ease, border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.create-chooser-card.is-deal {
+  background: linear-gradient(135deg, #0b34a6 0%, #09257a 100%);
+  border-color: rgba(96, 165, 250, 0.42);
+}
+
+.create-chooser-card:active {
+  transform: scale(0.98);
+}
+
+.create-chooser-tag {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #93c5fd;
+  background: rgba(26, 102, 255, 0.24);
+  padding: 4px 9px;
+  border-radius: 9999px;
+  margin-bottom: 8px;
+}
+
+.create-chooser-title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.015em;
+}
+
+.create-chooser-desc {
+  margin-top: 4px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: #bfdbfe;
+}
+
+.brand-logo-custom-img {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.deal-detail-brief-card {
+  width: 100%;
+  background: #081e59;
+  border: 1px solid rgba(147, 197, 253, 0.28);
+  border-radius: 18px;
+  padding: 15px 16px;
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.deal-brief-heading {
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #93c5fd;
+  margin-bottom: 5px;
+}
+
+.deal-brief-text {
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: #f1f5f9;
+}
+
+.deal-brief-reqs {
+  border-top: 1px solid rgba(147, 197, 253, 0.16);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.deal-brief-req-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: #e2e8f0;
+}
+
+.deal-brief-req-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: #1a66ff;
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Composer Full Pages (Create Post / Create Brand Deal) */
+.composer-page-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #062165 0%, #071e59 44%, #05143f 100%);
+  color: #ffffff;
+  overflow: hidden;
+}
+
+.composer-page-scroll {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  padding: max(env(safe-area-inset-top, 0px), 18px) 16px
+    max(env(safe-area-inset-bottom, 0px), 28px);
+  display: flex;
+  flex-direction: column;
+}
+
+.composer-page-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.composer-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  margin-bottom: 18px;
+}
+
+.composer-back-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 9999px;
+  border: 1px solid rgba(147, 197, 253, 0.28);
+  background: #0c2875;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.composer-back-btn:active {
+  transform: scale(0.92);
+}
+
+.composer-page-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+.composer-header-spacer {
+  width: 38px;
+  height: 38px;
+}
+
+.composer-author-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 18px;
+}
+
+.composer-author-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  object-fit: cover;
+  border: 1.5px solid rgba(147, 197, 253, 0.35);
+}
+
+.composer-author-name {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.composer-author-handle {
+  font-size: 12px;
+  color: #93c5fd;
+  margin-top: 2px;
+}
+
+.composer-section {
+  margin-bottom: 16px;
+}
+
+.composer-field-label {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #bfdbfe;
+  margin-bottom: 7px;
+  letter-spacing: -0.01em;
+}
+
+.composer-text-input,
+.composer-textarea {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(147, 197, 253, 0.28);
+  background: #0a205c;
+  color: #ffffff;
+  padding: 13px 14px;
+  font-family: inherit;
+  font-size: 14.5px;
+  outline: none;
+  resize: none;
+}
+
+.composer-text-input:focus,
+.composer-textarea:focus,
+.composer-numbered-row:focus-within,
+.composer-amount-box:focus-within {
+  border-color: #60a5fa;
+}
+
+.composer-text-input::placeholder,
+.composer-textarea::placeholder,
+.composer-row-input::placeholder,
+.composer-amount-input::placeholder {
+  color: rgba(191, 219, 254, 0.56);
+}
+
+.composer-photo-box {
+  width: 100%;
+  min-height: 196px;
+  border-radius: 18px;
+  border: 1.5px dashed rgba(147, 197, 253, 0.36);
+  background: #0a205c;
+  color: #bfdbfe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.composer-photo-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 24px;
+}
+
+.composer-photo-plus {
+  font-size: 26px;
+  font-weight: 400;
+  color: #60a5fa;
+}
+
+.composer-photo-preview {
+  width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+  display: block;
+}
+
+.composer-photo-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.composer-photo-action-btn {
+  flex: 1;
+  height: 38px;
+  border-radius: 9999px;
+  border: 1px solid rgba(147, 197, 253, 0.28);
+  background: #0c2875;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.composer-photo-action-btn.is-danger {
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.composer-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.composer-chip {
+  border: 1px solid rgba(147, 197, 253, 0.28);
+  background: #0c2875;
+  color: #dbeafe;
+  border-radius: 9999px;
+  padding: 8px 14px;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.composer-chip.active {
+  background: #1a66ff;
+  border-color: #60a5fa;
+  color: #ffffff;
+}
+
+.composer-numbered-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.composer-numbered-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(147, 197, 253, 0.28);
+  background: #0a205c;
+  padding: 6px 12px 6px 8px;
+}
+
+.composer-step-pill {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: #1a66ff;
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.composer-step-pill.is-req {
+  background: #0284c7;
+}
+
+.composer-row-input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 13.5px;
+}
+
+.composer-amount-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  border-radius: 14px;
+  border: 1px solid rgba(147, 197, 253, 0.28);
+  background: #0a205c;
+  padding: 0 14px;
+}
+
+.composer-currency-prefix {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  color: #60a5fa;
+}
+
+.composer-amount-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.composer-amount-preview {
+  background: #1a66ff;
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 9999px;
+  font-variant-numeric: tabular-nums;
+}
+
+.composer-error {
+  margin: 4px 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fca5a5;
+}
+
+.composer-submit-wrap {
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+.composer-primary-btn {
+  width: 100%;
+  height: 52px;
+  border: none;
+  border-radius: 9999px;
+  background: #1a66ff;
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(26, 102, 255, 0.32);
+}
+
+.composer-primary-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.composer-primary-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+/* Light Mode: Chooser & Composer Pages (Blue & White Theme) */
+[data-theme='light'] .create-chooser-card {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+[data-theme='light'] .create-chooser-card.is-deal {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+[data-theme='light'] .create-chooser-tag {
+  background: #dbeafe;
+  color: #0b45dc;
+}
+
+[data-theme='light'] .create-chooser-title {
+  color: #0f172a;
+}
+
+[data-theme='light'] .create-chooser-desc {
+  color: #475569;
+}
+
+[data-theme='light'] .deal-detail-brief-card {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+[data-theme='light'] .deal-brief-heading {
+  color: #0b45dc;
+}
+
+[data-theme='light'] .deal-brief-text,
+[data-theme='light'] .deal-brief-req-row {
+  color: #0f172a;
+}
+
+[data-theme='light'] .deal-brief-reqs {
+  border-top-color: #dbeafe;
+}
+
+[data-theme='light'] .composer-page-screen {
+  background: linear-gradient(180deg, #dbeafe 0%, #eff6ff 38%, #ffffff 100%);
+  color: #0f172a;
+}
+
+[data-theme='light'] .composer-back-btn,
+[data-theme='light'] .composer-photo-action-btn,
+[data-theme='light'] .composer-chip {
+  background: #ffffff;
+  border-color: #bfdbfe;
+  color: #0f172a;
+}
+
+[data-theme='light'] .composer-chip.active {
+  background: #0b45dc;
+  border-color: #0b45dc;
+  color: #ffffff;
+}
+
+[data-theme='light'] .composer-page-title,
+[data-theme='light'] .composer-author-name {
+  color: #0f172a;
+}
+
+[data-theme='light'] .composer-author-handle,
+[data-theme='light'] .composer-field-label {
+  color: #1e40af;
+}
+
+[data-theme='light'] .composer-text-input,
+[data-theme='light'] .composer-textarea,
+[data-theme='light'] .composer-numbered-row,
+[data-theme='light'] .composer-amount-box,
+[data-theme='light'] .composer-photo-box {
+  background: #ffffff;
+  border-color: #bfdbfe;
+  color: #0f172a;
+}
+
+[data-theme='light'] .composer-row-input,
+[data-theme='light'] .composer-amount-input {
+  color: #0f172a;
+}
+
+[data-theme='light'] .composer-text-input::placeholder,
+[data-theme='light'] .composer-textarea::placeholder,
+[data-theme='light'] .composer-row-input::placeholder,
+[data-theme='light'] .composer-amount-input::placeholder {
+  color: #94a3b8;
+}
+
+[data-theme='light'] .composer-photo-empty {
+  color: #1e40af;
+}
+
+[data-theme='light'] .composer-error {
+  color: #dc2626;
+}
+
+[data-theme='light'] .composer-primary-btn {
+  background: #0b45dc;
+}

@@ -1,8 +1,20 @@
 import React from 'react';
 
-export default function BrandLogoMark({ logoKey, name, size = 'card' }) {
+export default function BrandLogoMark({ logoKey, logoUrl, name, size = 'card' }) {
   const isHero = size === 'hero';
   const className = isHero ? 'brand-logo-wrap is-hero' : 'brand-logo-wrap';
+
+  if (logoUrl) {
+    return (
+      <span className={className}>
+        <img
+          src={logoUrl}
+          alt={name}
+          className="brand-logo-custom-img"
+        />
+      </span>
+    );
+  }
 
   switch (logoKey) {
     case 'mcdonalds':

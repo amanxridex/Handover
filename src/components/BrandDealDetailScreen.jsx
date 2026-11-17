@@ -130,6 +130,10 @@ export default function BrandDealDetailScreen({
   const deliverables = Array.isArray(deal.deliverables)
     ? deal.deliverables.slice(0, 3)
     : [];
+  const minRequirements = Array.isArray(deal.minRequirements)
+    ? deal.minRequirements.filter(Boolean).slice(0, 3)
+    : [];
+  const hasBriefSection = Boolean(deal.brief?.trim()) || minRequirements.length > 0;
 
   return (
     <div className="deal-detail-screen">
@@ -149,6 +153,7 @@ export default function BrandDealDetailScreen({
           <div className="deal-detail-logo">
             <BrandLogoMark
               logoKey={deal.logoKey}
+              logoUrl={deal.brandLogoUrl}
               name={deal.brandName}
               size="hero"
             />
@@ -170,6 +175,31 @@ export default function BrandDealDetailScreen({
             </div>
           ))}
         </section>
+
+        {hasBriefSection && (
+          <section
+            className="deal-detail-brief-card"
+            aria-label="Brief and minimum requirements"
+          >
+            {deal.brief?.trim() && (
+              <div className="deal-brief-block">
+                <div className="deal-brief-heading">Brief</div>
+                <p className="deal-brief-text">{deal.brief}</p>
+              </div>
+            )}
+            {minRequirements.length > 0 && (
+              <div className="deal-brief-reqs">
+                <div className="deal-brief-heading">Minimum Requirements</div>
+                {minRequirements.map((req, idx) => (
+                  <div key={idx} className="deal-brief-req-row">
+                    <span className="deal-brief-req-num">{idx + 1}</span>
+                    <span>{req}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         <section
           className="deal-detail-payment-card"

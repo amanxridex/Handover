@@ -380,6 +380,7 @@ export default function BrandDealsScreen({
                     <div className="deals-cover-logo">
                       <BrandLogoMark
                         logoKey={deal.logoKey}
+                        logoUrl={deal.brandLogoUrl}
                         name={deal.brandName}
                         size={isCenter ? 'hero' : 'card'}
                       />
@@ -462,6 +463,7 @@ export default function BrandDealsScreen({
                   >
                     <BrandLogoMark
                       logoKey={deal.logoKey}
+                      logoUrl={deal.brandLogoUrl}
                       name={deal.brandName}
                     />
                   </div>
