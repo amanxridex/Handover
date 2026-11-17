@@ -6115,7 +6115,30 @@ button,
 }
 
 .brand-logo-wrap.is-hero {
-  transform: scale(1.22);
+  transform: scale(1.16);
+}
+
+.brand-logo-real-img {
+  width: 68px;
+  height: 54px;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.brand-logo-real-img.is-wide {
+  width: 96px;
+  height: 48px;
+}
+
+.brand-logo-real-img.is-chipotle {
+  width: 118px;
+  height: 60px;
+}
+
+.brand-logo-real-img.is-invert {
+  filter: brightness(0) invert(1);
 }
 
 .deal-detail-screen {
@@ -6468,6 +6491,16 @@ button,
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
+}
+
+.deals-header-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  line-height: 1.15;
 }
 
 .deals-user-chip {
@@ -6834,9 +6867,20 @@ button,
   overflow: hidden;
 }
 
-.deals-mini-card .brand-logo-wrap svg {
+.deals-mini-card .brand-logo-wrap svg,
+.deals-mini-card .brand-logo-real-img {
   max-width: 100%;
   max-height: 44px;
+}
+
+.deals-mini-card .brand-logo-real-img.is-wide {
+  max-width: 82%;
+  max-height: 36px;
+}
+
+.deals-mini-card .brand-logo-real-img.is-chipotle {
+  max-width: 94%;
+  max-height: 50px;
 }
 
 .deals-mini-name {
@@ -6873,6 +6917,7 @@ button,
   color: #0f172a;
 }
 
+[data-theme='light'] .deals-header-title,
 [data-theme='light'] .deals-hello-label,
 [data-theme='light'] .deals-active-title,
 [data-theme='light'] .deals-meta-right,

@@ -1,17 +1,16 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import avatarDefault from '../assets/avatar-default.jpg';
 import { fetchBrandDeals, getFallbackDeals } from '../services/dealsService';
 import { triggerLightHaptic } from '../utils/nativeBridge';
 import BottomNav from './BottomNav';
 import BrandLogoMark from './BrandLogoMark';
-import { BellIcon, SearchIcon } from './Icons';
+import { SearchIcon } from './Icons';
 
 const CARD_PALETTES = {
   mcdonalds: 'linear-gradient(155deg, #b91c1c 0%, #dc2626 58%, #991b1b 100%)',
   dominos: 'linear-gradient(155deg, #1d4ed8 0%, #2563eb 58%, #1e40af 100%)',
-  starbucks: 'linear-gradient(155deg, #059669 0%, #10b981 58%, #047857 100%)',
-  chipotle: 'linear-gradient(155deg, #9f1239 0%, #be123c 58%, #881337 100%)',
-  nike: 'linear-gradient(155deg, #2563eb 0%, #60a5fa 55%, #1d4ed8 100%)',
+  starbucks: 'linear-gradient(155deg, #047857 0%, #059669 58%, #065f46 100%)',
+  chipotle: 'linear-gradient(155deg, #f8fafc 0%, #ffffff 55%, #f1f5f9 100%)',
+  nike: 'linear-gradient(155deg, #2563eb 0%, #3b82f6 55%, #1d4ed8 100%)',
   reebok: 'linear-gradient(155deg, #1e40af 0%, #3b82f6 58%, #1d4ed8 100%)',
   puma: 'linear-gradient(155deg, #ec4899 0%, #a855f7 55%, #6366f1 100%)',
   gymshark: 'linear-gradient(155deg, #0ea5e9 0%, #2563eb 58%, #1d4ed8 100%)',
@@ -19,7 +18,7 @@ const CARD_PALETTES = {
   adidas: 'linear-gradient(155deg, #06b6d4 0%, #0284c7 56%, #1d4ed8 100%)',
   uniqlo: 'linear-gradient(155deg, #e2e8f0 0%, #ffffff 55%, #cbd5e1 100%)',
   hm: 'linear-gradient(155deg, #f1f5f9 0%, #ffffff 55%, #e2e8f0 100%)',
-  playstation: 'linear-gradient(155deg, #e0f2fe 0%, #bae6fd 58%, #93c5fd 100%)',
+  playstation: 'linear-gradient(155deg, #f0f9ff 0%, #ffffff 58%, #e0f2fe 100%)',
   spotify: 'linear-gradient(155deg, #047857 0%, #059669 58%, #065f46 100%)',
   apple: 'linear-gradient(155deg, #6366f1 0%, #3b82f6 54%, #2563eb 100%)',
   sony: 'linear-gradient(155deg, #2563eb 0%, #1d4ed8 56%, #1e3a8a 100%)',
@@ -248,32 +247,12 @@ export default function BrandDealsScreen({
     }
   };
 
-  const displayName = currentUser?.name || 'Jacob Jones';
-  const avatarSrc = currentUser?.avatar || avatarDefault;
-
   return (
     <div className="deals-showcase-screen">
       <div className="deals-showcase-scroll">
-        {/* Top Greeting & Action Circles Header */}
+        {/* Top Title & Search Header */}
         <header className="deals-top-header">
-          <button
-            type="button"
-            className="deals-user-chip"
-            onClick={() => {
-              triggerLightHaptic();
-              onOpenProfile?.();
-            }}
-          >
-            <img
-              src={avatarSrc}
-              alt={displayName}
-              className="deals-user-avatar"
-            />
-            <div className="deals-user-greeting">
-              <span className="deals-hello-label">Hello</span>
-              <span className="deals-user-name">{displayName}</span>
-            </div>
-          </button>
+          <h1 className="deals-header-title">Creator Deals</h1>
 
           <div className="deals-top-actions">
             <button
@@ -287,17 +266,6 @@ export default function BrandDealsScreen({
               }}
             >
               <SearchIcon />
-            </button>
-            <button
-              type="button"
-              className="deals-circle-icon-btn"
-              aria-label="Notifications"
-              onClick={() => {
-                triggerLightHaptic();
-                onOpenNotifications?.();
-              }}
-            >
-              <BellIcon />
             </button>
           </div>
         </header>
@@ -397,7 +365,7 @@ export default function BrandDealsScreen({
             >
               <span className="deals-meta-left">{activeDeal.category}</span>
               <div className="deals-meta-center">
-                <h1 className="deals-active-title">{activeDeal.headline}</h1>
+                <h2 className="deals-active-title">{activeDeal.headline}</h2>
                 <p className="deals-active-sub">{activeDeal.brandName}</p>
               </div>
               <span className="deals-meta-right">{activeDeal.paymentAmount}</span>
