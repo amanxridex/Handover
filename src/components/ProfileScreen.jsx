@@ -3,9 +3,13 @@ import avatarDefault from '../assets/avatar-default.jpg';
 import {
   fetchBrandDealApplicants,
   fetchProfileBrandDeals,
+  getCachedProfileBrandDeals,
   setBrandDealStatus,
 } from '../services/dealsService';
-import { fetchUserProfileOverview } from '../services/feedService';
+import {
+  fetchUserProfileOverview,
+  getCachedProfileOverview,
+} from '../services/feedService';
 import {
   checkIsFollowingProfile,
   fetchPublicProfileByUsername,
@@ -60,15 +64,24 @@ export default function ProfileScreen({
   );
   const [isFollowing, setIsFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
-  const [loadingOverview, setLoadingOverview] = useState(true);
-  const [overview, setOverview] = useState({
-    posts: [],
-    followersCount: 0,
-    followingCount: 0,
-    postsCount: 0,
-  });
+  const initialCachedOverview = getCachedProfileOverview(
+    isPublicView ? profileUser?.id : currentUser?.id,
+    isPublicView ? viewedUsername : currentUser?.username
+  );
+  const initialCachedDeals = getCachedProfileBrandDeals(
+    isPublicView ? profileUser?.id : currentUser?.id
+  );
+  const [loadingOverview, setLoadingOverview] = useState(!initialCachedOverview);
+  const [overview, setOverview] = useState(
+    initialCachedOverview || {
+      posts: [],
+      followersCount: 0,
+      followingCount: 0,
+      postsCount: 0,
+    }
+  );
   const [contentTab, setContentTab] = useState('posts'); // posts | deals
-  const [profileDeals, setProfileDeals] = useState([]);
+  const [profileDeals, setProfileDeals] = useState(initialCachedDeals || []);
   const [loadingDeals, setLoadingDeals] = useState(false);
   const [togglingDealId, setTogglingDealId] = useState(null);
   const [requestsDeal, setRequestsDeal] = useState(null);
@@ -161,7 +174,13 @@ export default function ProfileScreen({
   useEffect(() => {
     if (!activeProfileId && !activeUsername) return;
     let active = true;
-    setLoadingOverview(true);
+    const warm = getCachedProfileOverview(activeProfileId, activeUsername);
+    if (warm) {
+      setOverview(warm);
+      setLoadingOverview(false);
+    } else {
+      setLoadingOverview(true);
+    }
     fetchUserProfileOverview(activeProfileId, activeUsername).then((data) => {
       if (!active) return;
       setOverview(data);
@@ -192,7 +211,13 @@ export default function ProfileScreen({
       setProfileDeals([]);
       return;
     }
-    setLoadingDeals(true);
+    const warmDeals = getCachedProfileBrandDeals(activeProfileId);
+    if (warmDeals) {
+      setProfileDeals(warmDeals);
+      setLoadingDeals(false);
+    } else {
+      setLoadingDeals(true);
+    }
     const list = await fetchProfileBrandDeals(activeProfileId);
     setProfileDeals(Array.isArray(list) ? list : []);
     setLoadingDeals(false);

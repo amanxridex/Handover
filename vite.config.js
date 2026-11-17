@@ -27,7 +27,7 @@ function handoverPwaPlugin() {
 
       // Include SPA rewrites and no-cache headers inside prebuilt dist output
       const distVercelConfig = {
-        rewrites: [{ source: '/(.*)', destination: '/index.html' }],
+        rewrites: [{ source: '/((?!api/).*)', destination: '/index.html' }],
         headers: [
           {
             source: '/sw.js',

@@ -1,4 +1,11 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import {
+  fetchRedisEndpoint,
+  getCachedValue,
+  invalidateCachePrefix,
+  invalidateServerRedisTags,
+  withSwrCache,
+} from './clientCache';
 import { createActivityNotification } from './notificationsService';
 import { getStoredSessionToken } from './profileService';
 
@@ -42,68 +49,83 @@ export function formatRelativeTime(iso) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-export async function fetchFeedPosts() {
+function mapFeedPostRow(row) {
+  const prof = Array.isArray(row.author) ? row.author[0] : row.author;
+  return {
+    id: row.id,
+    authorName: prof?.full_name || row.author_name || 'Handover Member',
+    authorHandle: prof?.username
+      ? `@${prof.username}`
+      : row.author_username
+        ? `@${row.author_username}`
+        : '@member',
+    avatar: prof?.avatar_url || row.author_avatar_url || '',
+    authorRole: prof?.role || row.author_role || 'creator',
+    companyName: prof?.company_name || row.author_company_name || '',
+    companyLogoUrl:
+      prof?.company_logo_url || row.author_company_logo_url || '',
+    time: formatRelativeTime(row.created_at),
+    createdAt: row.created_at || null,
+    headline: row.headline,
+    image: row.image_url || '',
+    likesCount: row.likes_count || 0,
+    commentsCount: 0,
+    liked: false,
+  };
+}
+
+export async function fetchFeedPosts({ force = false } = {}) {
   if (!isSupabaseConfigured || !supabase) return [];
-  try {
-    const { data, error } = await supabase
-      .from('posts')
-      .select(
-        `
-        id,
-        author_id,
-        headline,
-        image_url,
-        likes_count,
-        created_at,
-        author_name,
-        author_username,
-        author_avatar_url,
-        author_role,
-        author_company_name,
-        author_company_logo_url,
-        author:profiles (
-          id,
-          full_name,
-          username,
-          avatar_url,
-          role,
-          company_name,
-          company_logo_url
-        )
-      `
-      )
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: false })
-      .limit(25);
+  const rawRows = await withSwrCache(
+    'feed:raw_posts',
+    async () => {
+      const redisRows = await fetchRedisEndpoint('/api/feed', { force });
+      if (Array.isArray(redisRows)) {
+        return redisRows;
+      }
 
-    if (error || !Array.isArray(data)) return [];
+      try {
+        const { data, error } = await supabase
+          .from('posts')
+          .select(
+            `
+            id,
+            author_id,
+            headline,
+            image_url,
+            likes_count,
+            created_at,
+            author_name,
+            author_username,
+            author_avatar_url,
+            author_role,
+            author_company_name,
+            author_company_logo_url,
+            author:profiles (
+              id,
+              full_name,
+              username,
+              avatar_url,
+              role,
+              company_name,
+              company_logo_url
+            )
+          `
+          )
+          .eq('is_deleted', false)
+          .order('created_at', { ascending: false })
+          .limit(25);
 
-    return data.map((row) => {
-      const prof = Array.isArray(row.author) ? row.author[0] : row.author;
-      return {
-        id: row.id,
-        authorName: prof?.full_name || row.author_name || 'Handover Member',
-        authorHandle: prof?.username
-          ? `@${prof.username}`
-          : row.author_username
-            ? `@${row.author_username}`
-            : '@member',
-        avatar: prof?.avatar_url || row.author_avatar_url || '',
-        authorRole: prof?.role || row.author_role || 'creator',
-        companyName: prof?.company_name || row.author_company_name || '',
-        companyLogoUrl:
-          prof?.company_logo_url || row.author_company_logo_url || '',
-        time: formatRelativeTime(row.created_at),
-        headline: row.headline,
-        image: row.image_url || '',
-        likesCount: row.likes_count || 0,
-        commentsCount: 0,
-        liked: false,
-      };
-    });
-  } catch {
-    return [];
-  }
+        if (error || !Array.isArray(data)) return [];
+        return data;
+      } catch {
+        return [];
+      }
+    },
+    { ttlMs: 45000, force }
+  );
+
+  return Array.isArray(rawRows) ? rawRows.map(mapFeedPostRow) : [];
 }
 
 export async function fetchFeedEngagement({ postKeys, actorKey }) {
@@ -173,6 +195,18 @@ export async function createFeedPost(post) {
 
       const row = Array.isArray(data) ? data[0] : data;
       if (!error && row?.id) {
+        invalidateCachePrefix('feed:');
+        invalidateCachePrefix('home:');
+        invalidateCachePrefix('profile:');
+        const handleTag = (row.author_username || post.authorHandle || '')
+          .replace(/^@+/, '')
+          .toLowerCase();
+        invalidateServerRedisTags([
+          'feed',
+          post.authorId ? `profile:${post.authorId}` : null,
+          handleTag ? `profile:${handleTag}` : null,
+        ]);
+
         return {
           post: {
             ...post,
@@ -219,6 +253,15 @@ export async function createFeedPost(post) {
     if (error || !data) {
       return { post: null, error: error?.message || 'Failed to publish post' };
     }
+    invalidateCachePrefix('feed:');
+    invalidateCachePrefix('home:');
+    invalidateCachePrefix('profile:');
+    const handleTag = (post.authorHandle || '').replace(/^@+/, '').toLowerCase();
+    invalidateServerRedisTags([
+      'feed',
+      post.authorId ? `profile:${post.authorId}` : null,
+      handleTag ? `profile:${handleTag}` : null,
+    ]);
     return {
       post: {
         ...post,
@@ -479,7 +522,28 @@ export async function toggleCommentLikeInDb({
   }
 }
 
-export async function fetchUserProfileOverview(profileId, username) {
+export function getCachedProfileOverview(profileId, username) {
+  const cleanId = isUuid(profileId) ? profileId : '';
+  const cleanUser = (username || '').trim().replace(/^@+/, '').toLowerCase();
+  const cacheKey = `profile:overview:${cleanId || cleanUser || 'none'}`;
+  const raw = getCachedValue(cacheKey);
+  if (!raw) return null;
+  return {
+    ...raw,
+    posts: Array.isArray(raw.posts)
+      ? raw.posts.map((p) => ({
+          ...p,
+          time: p.createdAt ? formatRelativeTime(p.createdAt) : p.time,
+        }))
+      : [],
+  };
+}
+
+export async function fetchUserProfileOverview(
+  profileId,
+  username,
+  { force = false } = {}
+) {
   const empty = {
     posts: [],
     followersCount: 0,
@@ -491,62 +555,108 @@ export async function fetchUserProfileOverview(profileId, username) {
   if (!isSupabaseConfigured || !supabase || (!hasId && !cleanUsername)) {
     return empty;
   }
-  try {
-    let postsQuery = supabase
-      .from('posts')
-      .select('id, headline, image_url, category, likes_count, created_at')
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: false });
 
-    if (hasId && cleanUsername) {
-      postsQuery = postsQuery.or(
-        `author_id.eq.${profileId},author_username.ilike.${cleanUsername}`
-      );
-    } else if (hasId) {
-      postsQuery = postsQuery.eq('author_id', profileId);
-    } else {
-      postsQuery = postsQuery.ilike('author_username', cleanUsername);
-    }
+  const cacheKey = `profile:overview:${hasId ? profileId : cleanUsername.toLowerCase()}`;
 
-    const followersPromise = hasId
-      ? supabase
-          .from('follows')
-          .select('*', { count: 'exact', head: true })
-          .eq('following_id', profileId)
-      : Promise.resolve({ count: 0 });
+  const rawOverview = await withSwrCache(
+    cacheKey,
+    async () => {
+      const qs = new URLSearchParams();
+      if (hasId) qs.set('id', profileId);
+      if (cleanUsername) qs.set('username', cleanUsername);
 
-    const followingPromise = hasId
-      ? supabase
-          .from('follows')
-          .select('*', { count: 'exact', head: true })
-          .eq('follower_id', profileId)
-      : Promise.resolve({ count: 0 });
+      const redisData = await fetchRedisEndpoint(`/api/profile?${qs.toString()}`, {
+        force,
+      });
+      if (redisData && Array.isArray(redisData.posts)) {
+        return {
+          posts: redisData.posts.map((row) => ({
+            id: row.id,
+            title: row.headline,
+            image: row.image_url || '',
+            alt: row.headline,
+            tag: row.category || 'Post',
+            likesCount: row.likes_count || 0,
+            createdAt: row.created_at || null,
+            time: formatRelativeTime(row.created_at),
+          })),
+          followersCount: redisData.followersCount || 0,
+          followingCount: redisData.followingCount || 0,
+          postsCount: redisData.postsCount ?? redisData.posts.length,
+        };
+      }
 
-    const [postsRes, followersRes, followingRes] = await Promise.all([
-      postsQuery,
-      followersPromise,
-      followingPromise,
-    ]);
+      try {
+        let postsQuery = supabase
+          .from('posts')
+          .select('id, headline, image_url, category, likes_count, created_at')
+          .eq('is_deleted', false)
+          .order('created_at', { ascending: false });
 
-    const posts = Array.isArray(postsRes.data)
-      ? postsRes.data.map((row) => ({
-          id: row.id,
-          title: row.headline,
-          image: row.image_url || '',
-          alt: row.headline,
-          tag: row.category || 'Post',
-          likesCount: row.likes_count || 0,
-          time: formatRelativeTime(row.created_at),
+        if (hasId && cleanUsername) {
+          postsQuery = postsQuery.or(
+            `author_id.eq.${profileId},author_username.ilike.${cleanUsername}`
+          );
+        } else if (hasId) {
+          postsQuery = postsQuery.eq('author_id', profileId);
+        } else {
+          postsQuery = postsQuery.ilike('author_username', cleanUsername);
+        }
+
+        const followersPromise = hasId
+          ? supabase
+              .from('follows')
+              .select('*', { count: 'exact', head: true })
+              .eq('following_id', profileId)
+          : Promise.resolve({ count: 0 });
+
+        const followingPromise = hasId
+          ? supabase
+              .from('follows')
+              .select('*', { count: 'exact', head: true })
+              .eq('follower_id', profileId)
+          : Promise.resolve({ count: 0 });
+
+        const [postsRes, followersRes, followingRes] = await Promise.all([
+          postsQuery,
+          followersPromise,
+          followingPromise,
+        ]);
+
+        const posts = Array.isArray(postsRes.data)
+          ? postsRes.data.map((row) => ({
+              id: row.id,
+              title: row.headline,
+              image: row.image_url || '',
+              alt: row.headline,
+              tag: row.category || 'Post',
+              likesCount: row.likes_count || 0,
+              createdAt: row.created_at || null,
+              time: formatRelativeTime(row.created_at),
+            }))
+          : [];
+
+        return {
+          posts,
+          followersCount: followersRes.count || 0,
+          followingCount: followingRes.count || 0,
+          postsCount: posts.length,
+        };
+      } catch {
+        return empty;
+      }
+    },
+    { ttlMs: 45000, force }
+  );
+
+  if (!rawOverview) return empty;
+  return {
+    ...rawOverview,
+    posts: Array.isArray(rawOverview.posts)
+      ? rawOverview.posts.map((p) => ({
+          ...p,
+          time: p.createdAt ? formatRelativeTime(p.createdAt) : p.time,
         }))
-      : [];
-
-    return {
-      posts,
-      followersCount: followersRes.count || 0,
-      followingCount: followingRes.count || 0,
-      postsCount: posts.length,
-    };
-  } catch {
-    return empty;
-  }
+      : [],
+  };
 }

@@ -10,6 +10,11 @@ import handoverMarkBlue from '../assets/logos/handover-mark-blue.jpg';
 import handoverMark from '../assets/logos/handover-mark.png';
 import profileHero from '../assets/profile-hero.jpg';
 import {
+  getCachedValue,
+  isCacheFresh,
+  setCachedValue,
+} from '../services/clientCache';
+import {
   fetchFeedEngagement,
   fetchFeedPosts,
   getClientActorKey,
@@ -118,7 +123,9 @@ export default function HomeFeedScreen({
   const [activeCapsule, setActiveCapsule] = useState('squad-1');
   const [feedMode, setFeedMode] = useState('Feed');
   const [feedMenuOpen, setFeedMenuOpen] = useState(false);
-  const [posts, setPosts] = useState(INITIAL_POSTS);
+  const [posts, setPosts] = useState(
+    () => getCachedValue('home:merged_posts') || INITIAL_POSTS
+  );
   const [postedNotice, setPostedNotice] = useState('');
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -132,8 +139,8 @@ export default function HomeFeedScreen({
     [currentUser?.id]
   );
 
-  const loadFeedData = useCallback(async () => {
-    const remotePosts = await fetchFeedPosts();
+  const loadFeedData = useCallback(async ({ force = false } = {}) => {
+    const remotePosts = await fetchFeedPosts({ force });
 
     const starterIds = INITIAL_POSTS.map((p) => p.id);
     const allKeys = [
@@ -156,7 +163,7 @@ export default function HomeFeedScreen({
         ...prev.filter((p) => !remoteIds.has(p.id)),
       ];
 
-      return merged.map((post) => {
+      const hydrated = merged.map((post) => {
         const key = String(post.id);
         const counterOverride = engagement.countersByPost?.[key];
         const dbCommentCount = engagement.commentCountsByPost?.[key];
@@ -171,13 +178,17 @@ export default function HomeFeedScreen({
           liked: engagement.likedPostKeys?.has(key) || post.liked,
         };
       });
+
+      setCachedValue('home:merged_posts', hydrated);
+      return hydrated;
     });
   }, [actorKey]);
 
-  // Load live feed posts + live likes & comment counts from Supabase
+  // Load live feed posts + engagement only if client SWR cache is stale
   useEffect(() => {
+    if (isCacheFresh('home:merged_posts', 45000)) return undefined;
     let active = true;
-    loadFeedData().catch(() => {
+    loadFeedData({ force: false }).catch(() => {
       if (!active) return;
     });
     return () => {
@@ -211,7 +222,7 @@ export default function HomeFeedScreen({
     try {
       const [updating] = await Promise.all([
         checkAndApplyAppUpdate(),
-        loadFeedData(),
+        loadFeedData({ force: true }),
         new Promise((resolve) => setTimeout(resolve, 680)),
       ]);
       if (updating) {
@@ -284,8 +295,8 @@ export default function HomeFeedScreen({
   const toggleLike = (postId) => {
     triggerLightHaptic();
     let nextState = null;
-    setPosts((prev) =>
-      prev.map((p) => {
+    setPosts((prev) => {
+      const next = prev.map((p) => {
         if (p.id !== postId) return p;
         const nextLiked = !p.liked;
         const updatedCount = Math.max(
@@ -294,8 +305,10 @@ export default function HomeFeedScreen({
         );
         nextState = { liked: nextLiked, likesCount: updatedCount };
         return { ...p, liked: nextLiked, likesCount: updatedCount };
-      })
-    );
+      });
+      setCachedValue('home:merged_posts', next);
+      return next;
+    });
     if (nextState) {
       togglePostLikeInDb({
         postId,
@@ -307,9 +320,13 @@ export default function HomeFeedScreen({
   };
 
   const handleCommentsCountChange = (postId, count) => {
-    setPosts((prev) =>
-      prev.map((p) => (p.id === postId ? { ...p, commentsCount: count } : p))
-    );
+    setPosts((prev) => {
+      const next = prev.map((p) =>
+        p.id === postId ? { ...p, commentsCount: count } : p
+      );
+      setCachedValue('home:merged_posts', next);
+      return next;
+    });
   };
 
   const activeCommentsPost = useMemo(

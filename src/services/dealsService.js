@@ -1,5 +1,12 @@
 import { BRAND_DEAL_SECTIONS } from '../data/brandsData';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import {
+  fetchRedisEndpoint,
+  getCachedValue,
+  invalidateCachePrefix,
+  invalidateServerRedisTags,
+  withSwrCache,
+} from './clientCache';
 import { getStoredSessionToken } from './profileService';
 
 const APPS_CACHE_KEY = 'handover_deal_applications_v1';
@@ -111,30 +118,41 @@ function persistStoredDealApplications(list) {
   }
 }
 
-export async function fetchBrandDeals() {
+export async function fetchBrandDeals({ force = false } = {}) {
   const fallback = flattenFallbackDeals();
   if (!isSupabaseConfigured || !supabase) {
     return fallback;
   }
 
-  try {
-    const { data, error } = await supabase
-      .from('brand_deals')
-      .select(
-        'id, creator_profile_id, brand_name, category, logo_key, brand_logo_url, payment_amount, payment_cents, currency, headline, subtitle, deliverables, min_requirements, brief, payout_terms, is_active, sort_order'
-      )
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .order('sort_order', { ascending: true });
+  return withSwrCache(
+    'deals:active_list',
+    async () => {
+      const redisRows = await fetchRedisEndpoint('/api/deals', { force });
+      if (Array.isArray(redisRows) && redisRows.length > 0) {
+        return redisRows.map(mapDbDealRow);
+      }
 
-    if (error || !Array.isArray(data) || data.length === 0) {
-      return fallback;
-    }
+      try {
+        const { data, error } = await supabase
+          .from('brand_deals')
+          .select(
+            'id, creator_profile_id, brand_name, category, logo_key, brand_logo_url, payment_amount, payment_cents, currency, headline, subtitle, deliverables, min_requirements, brief, payout_terms, is_active, sort_order'
+          )
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+          .order('sort_order', { ascending: true });
 
-    return data.map(mapDbDealRow);
-  } catch {
-    return fallback;
-  }
+        if (error || !Array.isArray(data) || data.length === 0) {
+          return fallback;
+        }
+
+        return data.map(mapDbDealRow);
+      } catch {
+        return fallback;
+      }
+    },
+    { ttlMs: 90000, force }
+  );
 }
 
 export async function fetchBrandDealById(dealId) {
@@ -337,6 +355,9 @@ export async function createBrandDeal(input) {
       };
     }
 
+    invalidateCachePrefix('deals:');
+    invalidateCachePrefix('profile:deals:');
+    invalidateServerRedisTags(['deals']);
     return { ok: true, deal: data.deal };
   } catch (err) {
     return { ok: false, error: err?.message || 'Network error.' };
@@ -379,31 +400,45 @@ export async function updateBrandDeal({ dealId, ...input }) {
       };
     }
 
+    invalidateCachePrefix('deals:');
+    invalidateCachePrefix('profile:deals:');
+    invalidateServerRedisTags(['deals']);
     return { ok: true, deal: data.deal };
   } catch (err) {
     return { ok: false, error: err?.message || 'Network error.' };
   }
 }
 
-export async function fetchProfileBrandDeals(targetProfileId) {
+export function getCachedProfileBrandDeals(targetProfileId) {
+  if (!targetProfileId) return null;
+  return getCachedValue(`profile:deals:${targetProfileId}`);
+}
+
+export async function fetchProfileBrandDeals(targetProfileId, { force = false } = {}) {
   if (!targetProfileId || !isSupabaseConfigured || !supabase) {
     return [];
   }
 
-  try {
-    const { data, error } = await supabase.rpc('get_profile_brand_deals', {
-      p_target_profile_id: targetProfileId,
-      p_session_token: getStoredSessionToken() || null,
-    });
+  return withSwrCache(
+    `profile:deals:${targetProfileId}`,
+    async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_profile_brand_deals', {
+          p_target_profile_id: targetProfileId,
+          p_session_token: getStoredSessionToken() || null,
+        });
 
-    if (error || !Array.isArray(data)) {
-      return [];
-    }
+        if (error || !Array.isArray(data)) {
+          return [];
+        }
 
-    return data;
-  } catch {
-    return [];
-  }
+        return data;
+      } catch {
+        return [];
+      }
+    },
+    { ttlMs: 45000, force }
+  );
 }
 
 export async function setBrandDealStatus(dealId, isActive) {
@@ -422,6 +457,9 @@ export async function setBrandDealStatus(dealId, isActive) {
     if (error || !data?.ok) {
       return { ok: false, error: data?.error || error?.message || 'Update failed.' };
     }
+    invalidateCachePrefix('deals:');
+    invalidateCachePrefix('profile:deals:');
+    invalidateServerRedisTags(['deals']);
     return { ok: true, isActive: Boolean(data.isActive) };
   } catch (err) {
     return { ok: false, error: err?.message || 'Network error.' };

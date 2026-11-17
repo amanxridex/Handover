@@ -1,5 +1,6 @@
 import avatarDefault from '../assets/avatar-default.jpg';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { fetchRedisEndpoint, withSwrCache } from './clientCache';
 
 export const FOUNDER_CATEGORIES = [
   'All',
@@ -27,43 +28,58 @@ export function getFallbackFounders() {
   return [];
 }
 
-export async function fetchFoundersDirectory() {
+function mapDbFounderRow(row) {
+  return {
+    id: row.id,
+    fullName: row.full_name || 'Founder',
+    name: row.full_name || 'Founder',
+    username: row.username || 'founder',
+    companyName: row.company_name || row.full_name || 'Startup',
+    sector: normalizeFounderSector(row.sector),
+    rawSector: row.sector || 'Founder',
+    location: row.sector ? `${row.sector} · Verified Founder` : 'Verified Founder',
+    companyPitch: row.company_pitch || 'Building on Handover.',
+    avatar: row.company_logo_url || row.avatar_url || avatarDefault,
+    userAvatar: row.avatar_url || avatarDefault,
+    websiteUrl: row.website_url || '',
+    instagram: row.instagram_handle || '',
+    fromDb: true,
+  };
+}
+
+export async function fetchFoundersDirectory({ force = false } = {}) {
   if (!isSupabaseConfigured || !supabase) {
     return [];
   }
 
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select(
-        'id, full_name, username, avatar_url, role, company_name, company_logo_url, company_pitch, sector, website_url, instagram_handle, created_at'
-      )
-      .eq('role', 'founder')
-      .eq('onboarding_completed', true)
-      .order('created_at', { ascending: false })
-      .limit(50);
+  return withSwrCache(
+    'founders:directory',
+    async () => {
+      const redisRows = await fetchRedisEndpoint('/api/founders', { force });
+      if (Array.isArray(redisRows)) {
+        return redisRows.map(mapDbFounderRow);
+      }
 
-    if (error || !Array.isArray(data)) {
-      return [];
-    }
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select(
+            'id, full_name, username, avatar_url, role, company_name, company_logo_url, company_pitch, sector, website_url, instagram_handle, created_at'
+          )
+          .eq('role', 'founder')
+          .eq('onboarding_completed', true)
+          .order('created_at', { ascending: false })
+          .limit(50);
 
-    return data.map((row) => ({
-      id: row.id,
-      fullName: row.full_name || 'Founder',
-      name: row.full_name || 'Founder',
-      username: row.username || 'founder',
-      companyName: row.company_name || row.full_name || 'Startup',
-      sector: normalizeFounderSector(row.sector),
-      rawSector: row.sector || 'Founder',
-      location: row.sector ? `${row.sector} · Verified Founder` : 'Verified Founder',
-      companyPitch: row.company_pitch || 'Building on Handover.',
-      avatar: row.company_logo_url || row.avatar_url || avatarDefault,
-      userAvatar: row.avatar_url || avatarDefault,
-      websiteUrl: row.website_url || '',
-      instagram: row.instagram_handle || '',
-      fromDb: true,
-    }));
-  } catch {
-    return [];
-  }
+        if (error || !Array.isArray(data)) {
+          return [];
+        }
+
+        return data.map(mapDbFounderRow);
+      } catch {
+        return [];
+      }
+    },
+    { ttlMs: 90000, force }
+  );
 }

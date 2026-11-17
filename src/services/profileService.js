@@ -1,4 +1,9 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import {
+  invalidateCachePrefix,
+  invalidateServerRedisTags,
+  withSwrCache,
+} from './clientCache';
 import { sendPriorityPushToRecipient } from './nativeNotifySender';
 import { broadcastRealtimeEvent } from './realtimeService';
 
@@ -132,6 +137,7 @@ export function getStoredOnboardingState() {
 
 export function clearStoredOnboardingState() {
   const token = getStoredSessionToken();
+  invalidateCachePrefix('');
   try {
     window.localStorage.removeItem(STORAGE_KEY);
     window.localStorage.removeItem(SESSION_TOKEN_KEY);
@@ -392,42 +398,48 @@ export async function searchProfilesByName({
   }
 }
 
-export async function fetchPublicProfileByUsername(username) {
+export async function fetchPublicProfileByUsername(username, { force = false } = {}) {
   const clean = String(username || '').trim().replace(/^@+/, '').toLowerCase();
   if (!clean || !isSupabaseConfigured || !supabase) {
     return null;
   }
 
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select(
-        'id, full_name, username, avatar_url, role, company_name, company_logo_url, sector, company_pitch, bio, content_types'
-      )
-      .ilike('username', clean)
-      .limit(1)
-      .maybeSingle();
+  return withSwrCache(
+    `profile:public:${clean}`,
+    async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select(
+            'id, full_name, username, avatar_url, role, company_name, company_logo_url, sector, company_pitch, bio, content_types'
+          )
+          .ilike('username', clean)
+          .limit(1)
+          .maybeSingle();
 
-    if (error || !data) {
-      return null;
-    }
+        if (error || !data) {
+          return null;
+        }
 
-    return {
-      id: data.id,
-      fullName: data.full_name || 'Handover Member',
-      username: data.username || clean,
-      avatar: data.avatar_url || '',
-      role: data.role || 'creator',
-      companyName: data.company_name || '',
-      companyLogoUrl: data.company_logo_url || '',
-      sector: data.sector || '',
-      companyPitch: data.company_pitch || '',
-      bio: data.bio || data.company_pitch || '',
-      contentTypes: Array.isArray(data.content_types) ? data.content_types : [],
-    };
-  } catch {
-    return null;
-  }
+        return {
+          id: data.id,
+          fullName: data.full_name || 'Handover Member',
+          username: data.username || clean,
+          avatar: data.avatar_url || '',
+          role: data.role || 'creator',
+          companyName: data.company_name || '',
+          companyLogoUrl: data.company_logo_url || '',
+          sector: data.sector || '',
+          companyPitch: data.company_pitch || '',
+          bio: data.bio || data.company_pitch || '',
+          contentTypes: Array.isArray(data.content_types) ? data.content_types : [],
+        };
+      } catch {
+        return null;
+      }
+    },
+    { ttlMs: 60000, force }
+  );
 }
 
 export async function checkIsFollowingProfile(targetProfileId) {
@@ -463,9 +475,15 @@ export async function toggleFollowProfile(targetProfileId) {
         error: data?.error || error?.message || 'Could not update follow status.',
       };
     }
+    const me = getStoredOnboardingState();
+    const actorId = me?.id || me?.profileId || '';
+    invalidateCachePrefix('profile:overview:');
+    invalidateServerRedisTags([
+      `profile:${targetProfileId}`,
+      actorId ? `profile:${actorId}` : null,
+    ]);
+
     if (Boolean(data.following)) {
-      const me = getStoredOnboardingState();
-      const actorId = me?.id || me?.profileId || '';
       const actorName =
         me?.setupData?.name || me?.setupData?.username || 'Someone';
       const actorAvatar = me?.setupData?.avatar || '';
