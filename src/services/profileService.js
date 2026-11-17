@@ -389,3 +389,84 @@ export async function searchProfilesByName({
     return [];
   }
 }
+
+export async function fetchPublicProfileByUsername(username) {
+  const clean = String(username || '').trim().replace(/^@+/, '').toLowerCase();
+  if (!clean || !isSupabaseConfigured || !supabase) {
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select(
+        'id, full_name, username, avatar_url, role, company_name, company_logo_url, sector, company_pitch, bio, content_types'
+      )
+      .ilike('username', clean)
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return {
+      id: data.id,
+      fullName: data.full_name || 'Handover Member',
+      username: data.username || clean,
+      avatar: data.avatar_url || '',
+      role: data.role || 'creator',
+      companyName: data.company_name || '',
+      companyLogoUrl: data.company_logo_url || '',
+      sector: data.sector || '',
+      companyPitch: data.company_pitch || '',
+      bio: data.bio || data.company_pitch || '',
+      contentTypes: Array.isArray(data.content_types) ? data.content_types : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function checkIsFollowingProfile(targetProfileId) {
+  const token = getStoredSessionToken();
+  if (!token || !targetProfileId || !isSupabaseConfigured || !supabase) {
+    return false;
+  }
+  try {
+    const { data, error } = await supabase.rpc('is_following_profile', {
+      p_session_token: token,
+      p_target_profile_id: targetProfileId,
+    });
+    if (error) return false;
+    return Boolean(data);
+  } catch {
+    return false;
+  }
+}
+
+export async function toggleFollowProfile(targetProfileId) {
+  const token = getStoredSessionToken();
+  if (!token || !targetProfileId || !isSupabaseConfigured || !supabase) {
+    return { ok: false, error: 'Sign in required to follow users.' };
+  }
+  try {
+    const { data, error } = await supabase.rpc('toggle_follow_profile', {
+      p_session_token: token,
+      p_target_profile_id: targetProfileId,
+    });
+    if (error || !data?.ok) {
+      return {
+        ok: false,
+        error: data?.error || error?.message || 'Could not update follow status.',
+      };
+    }
+    return {
+      ok: true,
+      following: Boolean(data.following),
+      followersCount: data.followersCount ?? 0,
+    };
+  } catch (err) {
+    return { ok: false, error: err?.message || 'Network error.' };
+  }
+}

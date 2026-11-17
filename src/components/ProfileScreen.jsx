@@ -1,9 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import avatarDefault from '../assets/avatar-default.jpg';
 import { fetchUserProfileOverview } from '../services/feedService';
-import { triggerLightHaptic } from '../utils/nativeBridge';
+import {
+  checkIsFollowingProfile,
+  fetchPublicProfileByUsername,
+  toggleFollowProfile,
+} from '../services/profileService';
+import {
+  triggerLightHaptic,
+  triggerSuccessHaptic,
+} from '../utils/nativeBridge';
 import BottomNav from './BottomNav';
-import { CloseXIcon } from './Icons';
+import { BackTriangleIcon, CloseXIcon } from './Icons';
 
 function GearIcon() {
   return (
@@ -21,6 +29,10 @@ function GearIcon() {
 export default function ProfileScreen({
   currentUser,
   roleDetails,
+  isPublicView = false,
+  viewedUsername = '',
+  profileUser = null,
+  onMessageUser,
   showBadges = true,
   onClose,
   selectedPost,
@@ -32,6 +44,12 @@ export default function ProfileScreen({
   onSelectTab,
 }) {
   const [toastMsg, setToastMsg] = useState('');
+  const [resolvedPublicUser, setResolvedPublicUser] = useState(profileUser);
+  const [loadingProfile, setLoadingProfile] = useState(
+    Boolean(isPublicView && !profileUser && viewedUsername)
+  );
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followBusy, setFollowBusy] = useState(false);
   const [loadingOverview, setLoadingOverview] = useState(true);
   const [overview, setOverview] = useState({
     posts: [],
@@ -40,46 +58,149 @@ export default function ProfileScreen({
     postsCount: 0,
   });
 
-  const displayName = currentUser?.name?.trim() || 'Handover Member';
-  const username = currentUser?.username?.trim() || 'member';
-  const avatarSrc = currentUser?.avatar || avatarDefault;
-  const isFounder = roleDetails?.role === 'founder';
-
-  const bioText =
-    currentUser?.bio?.trim() ||
-    (isFounder
-      ? [
-          roleDetails?.companyName
-            ? `Founder of ${roleDetails.companyName}`
-            : 'Founder',
-          roleDetails?.sector,
-          roleDetails?.companyPitch,
-        ]
-          .filter(Boolean)
-          .join(' · ')
-      : Array.isArray(roleDetails?.contentTypes) &&
-          roleDetails.contentTypes.length > 0
-        ? `Creator · ${roleDetails.contentTypes.join(', ')}`
-        : '');
-
   useEffect(() => {
+    if (!isPublicView) {
+      setResolvedPublicUser(null);
+      setLoadingProfile(false);
+      return;
+    }
+    if (profileUser && profileUser.username?.toLowerCase() === viewedUsername?.toLowerCase()) {
+      setResolvedPublicUser(profileUser);
+    }
+    const targetHandle = profileUser?.username || viewedUsername;
+    if (!targetHandle) {
+      setLoadingProfile(false);
+      return;
+    }
+
     let active = true;
-    setLoadingOverview(true);
-    fetchUserProfileOverview(currentUser?.id, currentUser?.username).then(
-      (data) => {
-        if (!active) return;
-        setOverview(data);
-        setLoadingOverview(false);
+    if (!profileUser) setLoadingProfile(true);
+    fetchPublicProfileByUsername(targetHandle).then((fetched) => {
+      if (!active) return;
+      if (fetched) {
+        setResolvedPublicUser(fetched);
       }
-    );
+      setLoadingProfile(false);
+    });
     return () => {
       active = false;
     };
-  }, [currentUser?.id, currentUser?.username]);
+  }, [isPublicView, viewedUsername, profileUser]);
+
+  const activeProfileId = isPublicView
+    ? resolvedPublicUser?.id || profileUser?.id || null
+    : currentUser?.id;
+  const activeUsername = isPublicView
+    ? resolvedPublicUser?.username || profileUser?.username || viewedUsername || 'member'
+    : currentUser?.username?.trim() || 'member';
+
+  const displayName = isPublicView
+    ? resolvedPublicUser?.fullName || profileUser?.fullName || `@${activeUsername}`
+    : currentUser?.name?.trim() || 'Handover Member';
+  const username = activeUsername;
+  const avatarSrc = isPublicView
+    ? resolvedPublicUser?.avatar || profileUser?.avatar || avatarDefault
+    : currentUser?.avatar || avatarDefault;
+  const isFounder = isPublicView
+    ? (resolvedPublicUser?.role || profileUser?.role) === 'founder'
+    : roleDetails?.role === 'founder';
+  const activeCompanyName = isPublicView
+    ? resolvedPublicUser?.companyName || profileUser?.companyName || ''
+    : roleDetails?.companyName || '';
+  const activeCompanyLogo = isPublicView
+    ? resolvedPublicUser?.companyLogoUrl || profileUser?.companyLogoUrl || ''
+    : roleDetails?.companyLogoUrl || '';
+
+  const bioText = isPublicView
+    ? resolvedPublicUser?.bio?.trim() ||
+      (isFounder
+        ? [
+            activeCompanyName ? `Founder of ${activeCompanyName}` : 'Founder',
+            resolvedPublicUser?.sector,
+            resolvedPublicUser?.companyPitch,
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        : Array.isArray(resolvedPublicUser?.contentTypes) &&
+            resolvedPublicUser.contentTypes.length > 0
+          ? `Creator · ${resolvedPublicUser.contentTypes.join(', ')}`
+          : '')
+    : currentUser?.bio?.trim() ||
+      (isFounder
+        ? [
+            roleDetails?.companyName
+              ? `Founder of ${roleDetails.companyName}`
+              : 'Founder',
+            roleDetails?.sector,
+            roleDetails?.companyPitch,
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        : Array.isArray(roleDetails?.contentTypes) &&
+            roleDetails.contentTypes.length > 0
+          ? `Creator · ${roleDetails.contentTypes.join(', ')}`
+          : '');
+
+  useEffect(() => {
+    if (!activeProfileId && !activeUsername) return;
+    let active = true;
+    setLoadingOverview(true);
+    fetchUserProfileOverview(activeProfileId, activeUsername).then((data) => {
+      if (!active) return;
+      setOverview(data);
+      setLoadingOverview(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [activeProfileId, activeUsername]);
+
+  useEffect(() => {
+    if (!isPublicView || !activeProfileId) {
+      setIsFollowing(false);
+      return;
+    }
+    let active = true;
+    checkIsFollowingProfile(activeProfileId).then((following) => {
+      if (!active) return;
+      setIsFollowing(following);
+    });
+    return () => {
+      active = false;
+    };
+  }, [isPublicView, activeProfileId]);
 
   const showToast = (msg) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(''), 1800);
+  };
+
+  const handleToggleFollow = async () => {
+    if (!activeProfileId || followBusy) return;
+    triggerLightHaptic();
+    const prevFollowing = isFollowing;
+    const prevCount = overview.followersCount;
+
+    setFollowBusy(true);
+    setIsFollowing(!prevFollowing);
+    setOverview((prev) => ({
+      ...prev,
+      followersCount: Math.max(0, prev.followersCount + (prevFollowing ? -1 : 1)),
+    }));
+
+    const res = await toggleFollowProfile(activeProfileId);
+    setFollowBusy(false);
+
+    if (!res.ok) {
+      setIsFollowing(prevFollowing);
+      setOverview((prev) => ({ ...prev, followersCount: prevCount }));
+      showToast(res.error || 'Could not update follow');
+      return;
+    }
+
+    if (res.following) triggerSuccessHaptic();
+    setIsFollowing(res.following);
+    setOverview((prev) => ({ ...prev, followersCount: res.followersCount }));
   };
 
   const handleCopyHandle = async () => {
@@ -111,22 +232,50 @@ export default function ProfileScreen({
             triggerLightHaptic();
             onClose();
           }}
-          aria-label="Close profile"
+          aria-label={isPublicView ? 'Go back' : 'Close profile'}
         >
-          <CloseXIcon />
+          {isPublicView ? <BackTriangleIcon /> : <CloseXIcon />}
         </button>
 
-        <button
-          type="button"
-          className="profile-circle-btn"
-          onClick={() => {
-            triggerLightHaptic();
-            onOpenSettings?.();
-          }}
-          aria-label="Open settings"
-        >
-          <GearIcon />
-        </button>
+        {isPublicView ? (
+          <button
+            type="button"
+            className="profile-circle-btn"
+            onClick={handleCopyHandle}
+            aria-label={`Copy handle @${username}`}
+            title="Copy handle"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <rect
+                x="9"
+                y="9"
+                width="11"
+                height="11"
+                rx="2.5"
+                stroke="#FFFFFF"
+                strokeWidth="2"
+              />
+              <path
+                d="M6 15H5C3.9 15 3 14.1 3 13V5C3 3.9 3.9 3 5 3H13C14.1 3 15 3.9 15 5V6"
+                stroke="#FFFFFF"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="profile-circle-btn"
+            onClick={() => {
+              triggerLightHaptic();
+              onOpenSettings?.();
+            }}
+            aria-label="Open settings"
+          >
+            <GearIcon />
+          </button>
+        )}
       </header>
 
       {/* Scrollable Real User Profile */}
@@ -143,71 +292,107 @@ export default function ProfileScreen({
 
           <div className="profile-body">
             <div className="profile-name-row">
-              <h1 className="profile-name">{displayName}</h1>
+              <h1 className="profile-name">
+                {loadingProfile ? 'Loading...' : displayName}
+              </h1>
               {showBadges &&
                 isFounder &&
-                (roleDetails?.companyLogoUrl ? (
+                (activeCompanyLogo ? (
                   <img
-                    src={roleDetails.companyLogoUrl}
-                    alt={roleDetails.companyName || 'Company badge'}
+                    src={activeCompanyLogo}
+                    alt={activeCompanyName || 'Company badge'}
                     title={
-                      roleDetails.companyName
-                        ? `Founder of ${roleDetails.companyName}`
+                      activeCompanyName
+                        ? `Founder of ${activeCompanyName}`
                         : 'Founder'
                     }
                     className="profile-founder-badge"
                   />
-                ) : roleDetails?.companyName ? (
+                ) : activeCompanyName ? (
                   <span
                     className="profile-founder-monogram"
-                    title={`Founder of ${roleDetails.companyName}`}
+                    title={`Founder of ${activeCompanyName}`}
                   >
-                    {roleDetails.companyName.trim().charAt(0).toUpperCase()}
+                    {activeCompanyName.trim().charAt(0).toUpperCase()}
                   </span>
                 ) : null)}
             </div>
             <p className="profile-handle">@{username}</p>
 
-            <div className="profile-actions">
-              {onOpenSettings && (
+            {isPublicView ? (
+              <div className="profile-actions">
                 <button
                   type="button"
-                  className="profile-follow-btn"
+                  className={`profile-follow-btn ${
+                    isFollowing ? 'following' : ''
+                  }`}
+                  onClick={handleToggleFollow}
+                  disabled={followBusy || !activeProfileId}
+                >
+                  {isFollowing ? 'Following' : 'Follow'}
+                </button>
+
+                <button
+                  type="button"
+                  className="profile-msg-pill-btn"
                   onClick={() => {
                     triggerLightHaptic();
-                    onOpenSettings();
+                    const peer = resolvedPublicUser ||
+                      profileUser || {
+                        id: activeProfileId,
+                        fullName: displayName,
+                        username,
+                        avatar: avatarSrc,
+                      };
+                    onMessageUser?.(peer);
                   }}
+                  disabled={!activeProfileId}
                 >
-                  Settings &amp; Edit
+                  Message
                 </button>
-              )}
+              </div>
+            ) : (
+              <div className="profile-actions">
+                {onOpenSettings && (
+                  <button
+                    type="button"
+                    className="profile-follow-btn"
+                    onClick={() => {
+                      triggerLightHaptic();
+                      onOpenSettings();
+                    }}
+                  >
+                    Settings &amp; Edit
+                  </button>
+                )}
 
-              <button
-                type="button"
-                className="profile-msg-btn"
-                onClick={handleCopyHandle}
-                aria-label={`Copy handle @${username}`}
-                title="Copy handle"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                  <rect
-                    x="9"
-                    y="9"
-                    width="11"
-                    height="11"
-                    rx="2.5"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  />
-                  <path
-                    d="M6 15H5C3.9 15 3 14.1 3 13V5C3 3.9 3.9 3 5 3H13C14.1 3 15 3.9 15 5V6"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  className="profile-msg-btn"
+                  onClick={handleCopyHandle}
+                  aria-label={`Copy handle @${username}`}
+                  title="Copy handle"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <rect
+                      x="9"
+                      y="9"
+                      width="11"
+                      height="11"
+                      rx="2.5"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    />
+                    <path
+                      d="M6 15H5C3.9 15 3 14.1 3 13V5C3 3.9 3.9 3 5 3H13C14.1 3 15 3.9 15 5V6"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+            )}
 
             <div className="profile-stats">
               <div className="profile-stat">
@@ -230,20 +415,24 @@ export default function ProfileScreen({
 
             <div className="profile-bio-card">
               <p className="profile-bio-text">
-                {bioText || 'No bio yet — customize your profile in Settings.'}
+                {bioText ||
+                  (isPublicView
+                    ? `${displayName} hasn't added a bio yet.`
+                    : 'No bio yet — customize your profile in Settings.')}
               </p>
             </div>
 
             {loadingOverview ? (
               <div className="profile-empty-state">
-                <p className="profile-empty-sub">Loading your posts...</p>
+                <p className="profile-empty-sub">Loading posts...</p>
               </div>
             ) : overview.posts.length === 0 ? (
               <div className="profile-empty-state">
                 <div className="profile-empty-title">No posts yet</div>
                 <p className="profile-empty-sub">
-                  You haven&apos;t posted anything yet. Share your first post from
-                  the Home feed and it will show up right here.
+                  {isPublicView
+                    ? `${displayName} hasn't posted anything yet.`
+                    : "You haven't posted anything yet. Share your first post from the Home feed and it will show up right here."}
                 </p>
                 <button
                   type="button"
@@ -253,7 +442,7 @@ export default function ProfileScreen({
                     onClose();
                   }}
                 >
-                  Back to Home Feed
+                  {isPublicView ? 'Go Back' : 'Back to Home Feed'}
                 </button>
               </div>
             ) : (

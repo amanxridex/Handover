@@ -1,10 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import avatarDefault from '../assets/avatar-default.jpg';
 import chatAlice from '../assets/chat-alice.jpg';
 import chatBella from '../assets/chat-bella.jpg';
 import chatCharlie from '../assets/chat-charlie.jpg';
 import chatDavid from '../assets/chat-david.jpg';
 import creation3 from '../assets/creation-3.jpg';
 import creation6 from '../assets/creation-6.jpg';
+import {
+  fetchDirectMessages,
+  fetchMyDirectThreads,
+  isUuid,
+  sendDirectMessage,
+} from '../services/chatService';
 import { triggerLightHaptic } from '../utils/nativeBridge';
 import BottomNav from './BottomNav';
 import {
@@ -167,6 +174,7 @@ export default function ChatScreen({
   activeTab,
   onSelectTab,
   activeThreadId,
+  activePeer = null,
   onOpenThread,
   onCloseThread,
 }) {
@@ -176,6 +184,119 @@ export default function ChatScreen({
   const [storiesOpen, setStoriesOpen] = useState(true);
   const [draft, setDraft] = useState('');
   const [notice, setNotice] = useState('');
+
+  // Load persisted Supabase DM threads
+  useEffect(() => {
+    let active = true;
+    fetchMyDirectThreads().then((dbThreads) => {
+      if (!active || !Array.isArray(dbThreads) || dbThreads.length === 0) {
+        return;
+      }
+      setChats((prev) => {
+        const dbIds = new Set(dbThreads.map((t) => t.id));
+        const normalizedDb = dbThreads.map((t) => {
+          const existing = prev.find((p) => p.id === t.id);
+          return {
+            ...t,
+            avatar: t.avatar || avatarDefault,
+            messages: existing?.messages || [],
+          };
+        });
+        const rest = prev.filter((p) => !dbIds.has(p.id));
+        return [...normalizedDb, ...rest];
+      });
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Ensure an activePeer tapped from Search/Profile exists in thread list even before 1st message
+  useEffect(() => {
+    if (!activeThreadId || !activePeer || activePeer.id !== activeThreadId) {
+      return;
+    }
+    setChats((prev) => {
+      if (prev.some((c) => c.id === activePeer.id)) return prev;
+      const peerName = activePeer.fullName || activePeer.name || 'Member';
+      return [
+        {
+          id: activePeer.id,
+          shortName: peerName.split(' ')[0] || peerName,
+          name: peerName,
+          username: activePeer.username || '',
+          time: 'New chat',
+          avatar: activePeer.avatar || avatarDefault,
+          preview: 'Start a conversation',
+          isDbThread: true,
+          messages: [],
+        },
+        ...prev,
+      ];
+    });
+  }, [activeThreadId, activePeer]);
+
+  // Load live messages for DB UUID threads and refresh while thread is open
+  useEffect(() => {
+    if (!activeThreadId || !isUuid(activeThreadId)) return;
+    let active = true;
+
+    const loadMessages = () => {
+      fetchDirectMessages(activeThreadId).then((res) => {
+        if (!active || !res) return;
+        setChats((prev) => {
+          const exists = prev.some((c) => c.id === activeThreadId);
+          const peerName =
+            res.peer?.name ||
+            activePeer?.fullName ||
+            activePeer?.name ||
+            'Handover Member';
+          const lastMsg =
+            res.messages.length > 0
+              ? res.messages[res.messages.length - 1]
+              : null;
+
+          if (!exists) {
+            return [
+              {
+                id: activeThreadId,
+                shortName: peerName.split(' ')[0] || peerName,
+                name: peerName,
+                username: res.peer?.username || activePeer?.username || '',
+                avatar: res.peer?.avatar || activePeer?.avatar || avatarDefault,
+                time: lastMsg?.time || 'New chat',
+                preview: lastMsg?.text || 'Start a conversation',
+                isDbThread: true,
+                messages: res.messages,
+              },
+              ...prev,
+            ];
+          }
+
+          return prev.map((c) =>
+            c.id === activeThreadId
+              ? {
+                  ...c,
+                  name: res.peer?.name || c.name,
+                  shortName: res.peer?.shortName || c.shortName,
+                  avatar: res.peer?.avatar || c.avatar || avatarDefault,
+                  preview: lastMsg?.text || c.preview,
+                  time: lastMsg?.time || c.time,
+                  messages: res.messages,
+                }
+              : c
+          );
+        });
+      });
+    };
+
+    loadMessages();
+    const timer = setInterval(loadMessages, 4000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [activeThreadId, activePeer]);
 
   const filteredChats = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -203,12 +324,15 @@ export default function ChatScreen({
     setTimeout(() => setNotice(''), 1800);
   };
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
     const text = draft.trim();
     if (!text || !activeThread) return;
     triggerLightHaptic();
     const nowTime = formatCurrentTime();
+    const tempId = `me-${Date.now()}`;
+    setDraft('');
+
     setChats((prev) =>
       prev.map((c) =>
         c.id === activeThread.id
@@ -218,13 +342,32 @@ export default function ChatScreen({
               preview: text,
               messages: [
                 ...c.messages,
-                { id: `me-${Date.now()}`, from: 'me', text, time: nowTime },
+                { id: tempId, from: 'me', text, time: nowTime },
               ],
             }
           : c
       )
     );
-    setDraft('');
+
+    if (isUuid(activeThread.id)) {
+      const res = await sendDirectMessage(activeThread.id, text);
+      if (res.ok && res.message) {
+        setChats((prev) =>
+          prev.map((c) =>
+            c.id === activeThread.id
+              ? {
+                  ...c,
+                  messages: c.messages.map((m) =>
+                    m.id === tempId ? res.message : m
+                  ),
+                }
+              : c
+          )
+        );
+      } else {
+        showToast(res.error || 'Could not send message');
+      }
+    }
   };
 
   if (activeThread) {
@@ -288,9 +431,8 @@ export default function ChatScreen({
               return (
                 <div
                   key={msg.id}
-                  className={`chat-bubble ${msg.from === 'me' ? 'me' : 'them'} ${
-                    isShort ? 'inline' : 'stacked'
-                  }`}
+                  className={`chat-bubble ${msg.from === 'me' ? 'me' : 'them'} ${isShort ? 'inline' : 'stacked'
+                    }`}
                 >
                   <span className="chat-bubble-text">{msg.text}</span>
                   <span className="chat-bubble-time">{msg.time}</span>

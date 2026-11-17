@@ -856,6 +856,24 @@ body,
   background: rgba(255, 255, 255, 0.24);
 }
 
+.profile-msg-pill-btn {
+  flex: 1;
+  height: 46px;
+  border-radius: 9999px;
+  border: 1px solid rgba(147, 197, 253, 0.3);
+  background: #0c2875;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.14s ease, background-color 0.14s ease;
+}
+
+.profile-msg-pill-btn:active {
+  transform: scale(0.98);
+}
+
 .profile-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -5627,9 +5645,16 @@ body,
   color: #ffffff;
 }
 
-[data-theme='light'] .profile-msg-btn {
-  background: rgba(15, 23, 42, 0.08);
-  border-color: rgba(15, 23, 42, 0.14);
+[data-theme='light'] .profile-follow-btn.following {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+[data-theme='light'] .profile-msg-btn,
+[data-theme='light'] .profile-msg-pill-btn {
+  background: #ffffff;
+  border-color: #bfdbfe;
   color: #0f172a;
 }
 

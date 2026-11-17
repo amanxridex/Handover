@@ -152,6 +152,9 @@ function routeForSnapshot(snap) {
     return snap.activeChatId ? `/chat/${snap.activeChatId}` : '/chat';
   }
   if (snap.activeTab === 'search') {
+    if (snap.viewedUsername) {
+      return `/u/${snap.viewedUsername}`;
+    }
     if (snap.brandDealsOpen && snap.selectedDealId) {
       return `/deals/${snap.selectedDealId}`;
     }
@@ -171,6 +174,7 @@ function snapshotFromPathname(pathname, alreadyOnboarded) {
     activeTab: 'home',
     brandDealsOpen: false,
     selectedDealId: null,
+    viewedUsername: null,
     hasPostModal: false,
     activeChatId: null,
     activeCommentsPostId: null,
@@ -237,6 +241,15 @@ function snapshotFromPathname(pathname, alreadyOnboarded) {
       selectedDealId: dealId,
     };
   }
+  if (path.startsWith('/u/')) {
+    const uname = decodeURIComponent(path.slice('/u/'.length) || '') || null;
+    return {
+      ...base,
+      flowStep: 'main',
+      activeTab: 'search',
+      viewedUsername: uname,
+    };
+  }
   if (path === '/search') return { ...base, flowStep: 'main', activeTab: 'search' };
   if (path === '/settings') {
     return { ...base, flowStep: 'main', activeTab: 'profile', settingsOpen: true };
@@ -285,7 +298,11 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchedUsers, setSearchedUsers] = useState([]);
   const [searchingUsers, setSearchingUsers] = useState(false);
-  const [selectedSearchUser, setSelectedSearchUser] = useState(null);
+  const [viewedUsername, setViewedUsername] = useState(
+    initialRouteSnap.viewedUsername || null
+  );
+  const [viewedUserObj, setViewedUserObj] = useState(null);
+  const [activeChatPeer, setActiveChatPeer] = useState(null);
   const [selectedUser, setSelectedUser] = useState(
     initialStored?.setupData?.name
       ? { ...USER_PROFILES[0], name: initialStored.setupData.name }
@@ -336,6 +353,7 @@ export default function App() {
       activeTab,
       brandDealsOpen,
       selectedDealId,
+      viewedUsername,
       hasPostModal: Boolean(selectedPost),
       activeChatId,
       activeCommentsPostId,
@@ -351,6 +369,7 @@ export default function App() {
       activeTab,
       brandDealsOpen,
       selectedDealId,
+      viewedUsername,
       selectedPost,
       activeChatId,
       activeCommentsPostId,
@@ -462,6 +481,7 @@ export default function App() {
         setActiveTab(target.activeTab || 'home');
         setBrandDealsOpen(Boolean(target.brandDealsOpen));
         setSelectedDealId(target.selectedDealId || null);
+        setViewedUsername(target.viewedUsername || null);
         if (!target.hasPostModal) {
           setSelectedPost(null);
         }
@@ -491,6 +511,7 @@ export default function App() {
         activeTab,
         brandDealsOpen,
         selectedDealId,
+        viewedUsername,
         hasPostModal: Boolean(selectedPost),
         activeChatId,
         activeCommentsPostId,
@@ -515,6 +536,7 @@ export default function App() {
     activeTab,
     brandDealsOpen,
     selectedDealId,
+    viewedUsername,
     selectedPost,
     activeChatId,
     activeCommentsPostId,
@@ -572,6 +594,10 @@ export default function App() {
       } else if (activeTab === 'home' && notificationsOpen) {
         setTransitionMode('pop');
         setNotificationsOpen(false);
+      } else if (activeTab === 'search' && viewedUsername) {
+        setTransitionMode('pop');
+        setViewedUsername(null);
+        setViewedUserObj(null);
       } else if (activeTab === 'search' && brandDealsOpen) {
         setTransitionMode('pop');
         if (selectedDealId) {
@@ -591,6 +617,8 @@ export default function App() {
     if (tabId !== 'search') {
       setBrandDealsOpen(false);
       setSelectedDealId(null);
+      setViewedUsername(null);
+      setViewedUserObj(null);
     }
     setActiveTab(tabId);
   };
@@ -601,7 +629,7 @@ export default function App() {
 
   const handleBack = () => {
     triggerLightHaptic();
-    if (brandDealsOpen) {
+    if (brandDealsOpen || viewedUsername) {
       goBackInHistory();
       return;
     }
@@ -643,6 +671,9 @@ export default function App() {
     setActiveTab('home');
     setBrandDealsOpen(false);
     setSelectedDealId(null);
+    setViewedUsername(null);
+    setViewedUserObj(null);
+    setActiveChatPeer(null);
     setFoundersOpen(false);
     setCreatorsOpen(false);
     setCreatePage(null);
@@ -707,6 +738,9 @@ export default function App() {
     setBrandDealsOpen(false);
     setSelectedDealId(null);
     setSelectedDealObj(null);
+    setViewedUsername(null);
+    setViewedUserObj(null);
+    setActiveChatPeer(null);
     setFoundersOpen(false);
     setCreatorsOpen(false);
     setCreatePage(null);
@@ -720,6 +754,7 @@ export default function App() {
       activeTab: 'home',
       brandDealsOpen: false,
       selectedDealId: null,
+      viewedUsername: null,
       hasPostModal: false,
       activeChatId: null,
       activeCommentsPostId: null,
@@ -792,11 +827,13 @@ export default function App() {
             ? 'creators'
             : activeTab === 'home' && notificationsOpen
               ? 'notifications'
-              : activeTab === 'search' && brandDealsOpen && selectedDealId
-                ? `brand-deal-${selectedDealId}`
-                : activeTab === 'search' && brandDealsOpen
-                  ? 'brand-deals'
-                  : `tab-${activeTab}`;
+              : activeTab === 'search' && viewedUsername
+                ? `public-profile-${viewedUsername}`
+                : activeTab === 'search' && brandDealsOpen && selectedDealId
+                  ? `brand-deal-${selectedDealId}`
+                  : activeTab === 'search' && brandDealsOpen
+                    ? 'brand-deals'
+                    : `tab-${activeTab}`;
 
   return (
     <div className="viewport-stage">
@@ -1041,8 +1078,36 @@ export default function App() {
             activeTab={activeTab}
             onSelectTab={handleTabSelect}
             activeThreadId={activeChatId}
+            activePeer={activeChatPeer}
             onOpenThread={(id) => setActiveChatId(id)}
             onCloseThread={goBackInHistory}
+          />
+        ) : activeTab === 'search' && viewedUsername ? (
+          <ProfileScreen
+            isPublicView
+            viewedUsername={viewedUsername}
+            profileUser={
+              viewedUserObj?.username?.toLowerCase() === viewedUsername?.toLowerCase()
+                ? viewedUserObj
+                : null
+            }
+            showBadges={settings.showBadges}
+            onClose={goBackInHistory}
+            selectedPost={selectedPost}
+            onSelectPost={setSelectedPost}
+            onClosePost={goBackInHistory}
+            onMessageUser={(peer) => {
+              if (!peer?.id) return;
+              setViewedUsername(null);
+              setViewedUserObj(null);
+              setActiveChatPeer(peer);
+              setActiveChatId(peer.id);
+              setTransitionMode('push');
+              setActiveTab('chat');
+            }}
+            tabs={TABS}
+            activeTab={activeTab}
+            onSelectTab={handleTabSelect}
           />
         ) : activeTab === 'search' && brandDealsOpen && selectedDealId ? (
           <BrandDealDetailScreen
@@ -1151,7 +1216,9 @@ export default function App() {
                           className="search-result-row search-user-row"
                           onClick={() => {
                             triggerLightHaptic();
-                            setSelectedSearchUser(person);
+                            setTransitionMode('push');
+                            setViewedUserObj(person);
+                            setViewedUsername(person.username);
                           }}
                         >
                           <div className="search-user-left">
@@ -1211,72 +1278,6 @@ export default function App() {
                 onSelectTab={handleTabSelect}
               />
             </div>
-
-            {selectedSearchUser && (
-              <div
-                className="founders-modal-backdrop"
-                role="dialog"
-                aria-modal="true"
-                aria-label={selectedSearchUser.fullName}
-                onClick={() => setSelectedSearchUser(null)}
-              >
-                <div
-                  className="founders-modal-sheet"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="founders-modal-head">
-                    <img
-                      src={selectedSearchUser.avatar || avatarDefault}
-                      alt={selectedSearchUser.fullName}
-                      className="founders-modal-thumb"
-                    />
-                    <div>
-                      <h2 className="founders-modal-title">
-                        {selectedSearchUser.fullName}
-                      </h2>
-                      <p className="founders-modal-sub">
-                        @{selectedSearchUser.username}
-                        {selectedSearchUser.companyName
-                          ? ` · ${selectedSearchUser.companyName}`
-                          : ''}
-                      </p>
-                      <p className="founders-modal-sector">
-                        {selectedSearchUser.role === 'founder'
-                          ? selectedSearchUser.sector || 'Founder'
-                          : (selectedSearchUser.contentTypes || ['Creator']).join(' · ')}
-                      </p>
-                    </div>
-                  </div>
-
-                  {selectedSearchUser.bio && (
-                    <p className="founders-modal-pitch">
-                      {selectedSearchUser.bio}
-                    </p>
-                  )}
-
-                  <div className="founders-modal-actions">
-                    <button
-                      type="button"
-                      className="founders-modal-secondary"
-                      onClick={() => setSelectedSearchUser(null)}
-                    >
-                      Close
-                    </button>
-                    <button
-                      type="button"
-                      className="founders-modal-primary"
-                      onClick={() => {
-                        triggerLightHaptic();
-                        setSelectedSearchUser(null);
-                        handleTabSelect('chat');
-                      }}
-                    >
-                      Message
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </>
         )}
         </div>
