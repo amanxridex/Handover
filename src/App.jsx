@@ -911,11 +911,27 @@ export default function App() {
           />
         ) : activeTab === 'search' && brandDealsOpen ? (
           <BrandDealsScreen
+            currentUser={{
+              id: profileId,
+              name: selectedUser.name,
+              username: setupData.username,
+              avatar: setupData.avatar,
+            }}
             onBack={goBackInHistory}
             onSelectDeal={(deal) => {
               setTransitionMode('push');
               setSelectedDealObj(deal);
               setSelectedDealId(deal.id);
+            }}
+            onOpenNotifications={() => {
+              setBrandDealsOpen(false);
+              setTransitionMode('push');
+              setActiveTab('home');
+              setNotificationsOpen(true);
+            }}
+            onOpenProfile={() => {
+              setBrandDealsOpen(false);
+              handleTabSelect('profile');
             }}
             tabs={TABS}
             activeTab={activeTab}

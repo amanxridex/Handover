@@ -5,7 +5,7 @@ import { getStoredSessionToken } from './profileService';
 const APPS_CACHE_KEY = 'handover_deal_applications_v1';
 const CATEGORY_ORDER = ['Restaurants', 'Sports', 'Clothing', 'Tech'];
 
-function flattenFallbackDeals() {
+export function getFallbackDeals() {
   const rows = [];
   let sortOrder = 1;
   for (const sec of BRAND_DEAL_SECTIONS) {
@@ -31,6 +31,10 @@ function flattenFallbackDeals() {
     }
   }
   return rows;
+}
+
+function flattenFallbackDeals() {
+  return getFallbackDeals();
 }
 
 function mapDbDealRow(row) {
@@ -111,6 +115,7 @@ export async function fetchBrandDeals() {
         'id, brand_name, category, logo_key, payment_amount, payment_cents, currency, headline, subtitle, deliverables, payout_terms, sort_order'
       )
       .eq('is_active', true)
+      .order('created_at', { ascending: false })
       .order('sort_order', { ascending: true });
 
     if (error || !Array.isArray(data) || data.length === 0) {
