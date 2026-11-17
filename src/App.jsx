@@ -19,7 +19,6 @@ import {
   SearchTabIcon,
 } from './components/Icons';
 import {
-  CATEGORIES,
   PROMO_BY_CATEGORY,
   USER_PROFILES,
 } from './data/brandsData';
@@ -291,7 +290,6 @@ export default function App() {
   const [roleDetails, setRoleDetails] = useState(
     initialStored?.roleDetails || null
   );
-  const [selectedCategory, setSelectedCategory] = useState('All');
   const [activeTab, setActiveTab] = useState(initialRouteSnap.activeTab);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState(
@@ -533,7 +531,7 @@ export default function App() {
     settingsOpen,
   ]);
 
-  const activePromo = PROMO_BY_CATEGORY[selectedCategory] || PROMO_BY_CATEGORY.All;
+  const activePromo = PROMO_BY_CATEGORY.All;
 
   const filteredBrands = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -549,11 +547,6 @@ export default function App() {
     triggerLightHaptic();
     window.history.back();
   }, []);
-
-  const handleCategorySelect = (cat) => {
-    triggerLightHaptic();
-    setSelectedCategory(cat);
-  };
 
   const handleTabSelect = (tabId) => {
     triggerLightHaptic();
@@ -602,10 +595,6 @@ export default function App() {
     }
     if (searchQuery) {
       setSearchQuery('');
-      return;
-    }
-    if (selectedCategory !== 'All') {
-      setSelectedCategory('All');
       return;
     }
     goBackInHistory();
@@ -1152,24 +1141,6 @@ export default function App() {
                   </div>
                 )}
               </section>
-
-              {/* Category Filter Chips */}
-              <nav className="category-row" aria-label="Brand categories">
-                {CATEGORIES.map((category) => {
-                  const isActive = selectedCategory === category;
-                  return (
-                    <button
-                      key={category}
-                      type="button"
-                      className={`category-pill ${isActive ? 'active' : ''}`}
-                      onClick={() => handleCategorySelect(category)}
-                      aria-pressed={isActive}
-                    >
-                      {category}
-                    </button>
-                  );
-                })}
-              </nav>
 
               {/* Featured Promo Banner */}
               <section className="promo-wrap">
