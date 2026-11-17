@@ -2248,40 +2248,52 @@ body,
   cursor: pointer;
 }
 
+@keyframes feedMenuDrop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
 .feed-mode-menu {
   position: absolute;
   top: 34px;
   left: 50%;
   transform: translateX(-50%);
-  width: 140px;
-  background: rgba(24, 24, 30, 0.96);
+  width: 144px;
+  background: #1c1d22;
   border: 1px solid rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border-radius: 14px;
   padding: 5px;
-  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.44);
   z-index: 25;
+  animation: feedMenuDrop 0.16s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .feed-mode-item {
   width: 100%;
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.84);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
-  padding: 8px 10px;
-  border-radius: 9px;
+  padding: 9px 11px;
+  border-radius: 10px;
   text-align: left;
   cursor: pointer;
 }
 
 .feed-mode-item.active {
-  background: rgba(255, 255, 255, 0.12);
+  background: #2f3139;
   color: #ffffff;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .feed-stories-row {

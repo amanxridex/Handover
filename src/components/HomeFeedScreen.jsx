@@ -108,6 +108,7 @@ export default function HomeFeedScreen({
 }) {
   const fileInputRef = useRef(null);
   const feedScrollRef = useRef(null);
+  const feedMenuRef = useRef(null);
   const pullStartYRef = useRef(null);
   const pullStartXRef = useRef(null);
   const pullTriggeredHapticRef = useRef(false);
@@ -183,6 +184,17 @@ export default function HomeFeedScreen({
       active = false;
     };
   }, [loadFeedData]);
+
+  useEffect(() => {
+    if (!feedMenuOpen) return;
+    const handleOutside = (e) => {
+      if (feedMenuRef.current && !feedMenuRef.current.contains(e.target)) {
+        setFeedMenuOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', handleOutside);
+    return () => document.removeEventListener('pointerdown', handleOutside);
+  }, [feedMenuOpen]);
 
   const showNotice = (msg) => {
     setPostedNotice(msg);
@@ -507,7 +519,7 @@ export default function HomeFeedScreen({
             />
           </button>
 
-          <div className="feed-title-wrap">
+          <div className="feed-title-wrap" ref={feedMenuRef}>
             <button
               type="button"
               className="feed-title-btn"
@@ -523,7 +535,7 @@ export default function HomeFeedScreen({
 
             {feedMenuOpen && (
               <div className="feed-mode-menu" role="menu">
-                {['Feed', 'Following', 'Nearby'].map((mode) => (
+                {['Feed', 'Founders'].map((mode) => (
                   <button
                     key={mode}
                     type="button"
