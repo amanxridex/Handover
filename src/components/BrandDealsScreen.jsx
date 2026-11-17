@@ -7,22 +7,22 @@ import BrandLogoMark from './BrandLogoMark';
 import { BellIcon, SearchIcon } from './Icons';
 
 const CARD_PALETTES = {
-  mcdonalds: 'linear-gradient(155deg, #2b1608 0%, #5c2708 55%, #1d1007 100%)',
-  dominos: 'linear-gradient(155deg, #0b1c48 0%, #15347a 58%, #091536 100%)',
-  starbucks: 'linear-gradient(155deg, #07291c 0%, #0f4c35 58%, #061c14 100%)',
-  chipotle: 'linear-gradient(155deg, #2f0d11 0%, #5e1820 58%, #1f090c 100%)',
-  nike: 'linear-gradient(155deg, #1e6bff 0%, #5b9dff 52%, #0d3eb8 100%)',
-  reebok: 'linear-gradient(155deg, #0f1f4a 0%, #1d3c8c 58%, #0a1433 100%)',
-  puma: 'linear-gradient(155deg, #ec4899 0%, #a855f7 52%, #6366f1 100%)',
-  gymshark: 'linear-gradient(155deg, #0ea5e9 0%, #2563eb 58%, #0c3599 100%)',
-  zara: 'linear-gradient(155deg, #f97316 0%, #fb7185 52%, #be123c 100%)',
-  adidas: 'linear-gradient(155deg, #06b6d4 0%, #0284c7 56%, #1e3a8a 100%)',
-  uniqlo: 'linear-gradient(155deg, #1b2234 0%, #2b3654 58%, #101521 100%)',
-  hm: 'linear-gradient(155deg, #1d2438 0%, #313b5a 58%, #121724 100%)',
-  playstation: 'linear-gradient(155deg, #071940 0%, #103278 58%, #05112c 100%)',
-  spotify: 'linear-gradient(155deg, #062116 0%, #0d3b27 58%, #04150e 100%)',
-  apple: 'linear-gradient(155deg, #6366f1 0%, #3b82f6 54%, #1d4ed8 100%)',
-  sony: 'linear-gradient(155deg, #334155 0%, #1e293b 54%, #0f172a 100%)',
+  mcdonalds: 'linear-gradient(155deg, #b91c1c 0%, #dc2626 58%, #991b1b 100%)',
+  dominos: 'linear-gradient(155deg, #1d4ed8 0%, #2563eb 58%, #1e40af 100%)',
+  starbucks: 'linear-gradient(155deg, #059669 0%, #10b981 58%, #047857 100%)',
+  chipotle: 'linear-gradient(155deg, #9f1239 0%, #be123c 58%, #881337 100%)',
+  nike: 'linear-gradient(155deg, #2563eb 0%, #60a5fa 55%, #1d4ed8 100%)',
+  reebok: 'linear-gradient(155deg, #1e40af 0%, #3b82f6 58%, #1d4ed8 100%)',
+  puma: 'linear-gradient(155deg, #ec4899 0%, #a855f7 55%, #6366f1 100%)',
+  gymshark: 'linear-gradient(155deg, #0ea5e9 0%, #2563eb 58%, #1d4ed8 100%)',
+  zara: 'linear-gradient(155deg, #f97316 0%, #fb7185 55%, #e11d48 100%)',
+  adidas: 'linear-gradient(155deg, #06b6d4 0%, #0284c7 56%, #1d4ed8 100%)',
+  uniqlo: 'linear-gradient(155deg, #e2e8f0 0%, #ffffff 55%, #cbd5e1 100%)',
+  hm: 'linear-gradient(155deg, #f1f5f9 0%, #ffffff 55%, #e2e8f0 100%)',
+  playstation: 'linear-gradient(155deg, #e0f2fe 0%, #bae6fd 58%, #93c5fd 100%)',
+  spotify: 'linear-gradient(155deg, #047857 0%, #059669 58%, #065f46 100%)',
+  apple: 'linear-gradient(155deg, #6366f1 0%, #3b82f6 54%, #2563eb 100%)',
+  sony: 'linear-gradient(155deg, #2563eb 0%, #1d4ed8 56%, #1e3a8a 100%)',
 };
 
 const RECENT_COUNT = 6;
