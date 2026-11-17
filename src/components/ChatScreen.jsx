@@ -10,7 +10,6 @@ import BottomNav from './BottomNav';
 import {
   BackChevronIcon,
   ChevronDownIcon,
-  MicIcon,
   PaperPlaneIcon,
   PhoneIcon,
   UserInfoIcon,
@@ -358,7 +357,6 @@ export default function ChatScreen({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-              <MicIcon />
             </label>
 
             <button
