@@ -27,6 +27,7 @@ import ChatScreen from './components/ChatScreen';
 import BottomNav from './components/BottomNav';
 import BrandDealDetailScreen from './components/BrandDealDetailScreen';
 import BrandDealsScreen from './components/BrandDealsScreen';
+import FoundersScreen from './components/FoundersScreen';
 import HomeFeedScreen from './components/HomeFeedScreen';
 import NotificationsScreen from './components/NotificationsScreen';
 import OnboardingScreen from './components/OnboardingScreen';
@@ -144,6 +145,7 @@ function routeForSnapshot(snap) {
     return '/onboarding/role';
   }
   if (snap.activeTab === 'home') {
+    if (snap.foundersOpen) return '/founders';
     if (snap.notificationsOpen) return '/notifications';
     if (snap.activeCommentsPostId) {
       return `/post/${snap.activeCommentsPostId}/comments`;
@@ -177,6 +179,7 @@ function snapshotFromPathname(pathname, alreadyOnboarded) {
     activeChatId: null,
     activeCommentsPostId: null,
     notificationsOpen: false,
+    foundersOpen: false,
     settingsOpen: false,
   };
   if (!alreadyOnboarded) {
@@ -189,6 +192,9 @@ function snapshotFromPathname(pathname, alreadyOnboarded) {
     if (path === '/onboarding/founder/details') return { ...base, flowStep: 'role', roleSubStep: 'founder-2' };
     if (path === '/onboarding/creator') return { ...base, flowStep: 'role', roleSubStep: 'creator-1' };
     return base;
+  }
+  if (path === '/founders') {
+    return { ...base, flowStep: 'main', activeTab: 'home', foundersOpen: true };
   }
   if (path === '/notifications') {
     return { ...base, flowStep: 'main', activeTab: 'home', notificationsOpen: true };
@@ -291,6 +297,9 @@ export default function App() {
   const [notificationsOpen, setNotificationsOpen] = useState(
     initialRouteSnap.notificationsOpen
   );
+  const [foundersOpen, setFoundersOpen] = useState(
+    Boolean(initialRouteSnap.foundersOpen)
+  );
   const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
   const [exitHint, setExitHint] = useState(false);
   const [transitionMode, setTransitionMode] = useState('none'); // none | push | pop | tab-right | tab-left
@@ -316,6 +325,7 @@ export default function App() {
       activeChatId,
       activeCommentsPostId,
       notificationsOpen,
+      foundersOpen,
       settingsOpen,
     }),
     [
@@ -328,6 +338,7 @@ export default function App() {
       activeChatId,
       activeCommentsPostId,
       notificationsOpen,
+      foundersOpen,
       settingsOpen,
     ]
   );
@@ -438,6 +449,7 @@ export default function App() {
         setActiveChatId(target.activeChatId || null);
         setActiveCommentsPostId(target.activeCommentsPostId || null);
         setNotificationsOpen(Boolean(target.notificationsOpen));
+        setFoundersOpen(Boolean(target.foundersOpen));
         setSettingsOpen(Boolean(target.settingsOpen));
         return;
       }
@@ -462,6 +474,7 @@ export default function App() {
         activeChatId,
         activeCommentsPostId,
         notificationsOpen,
+        foundersOpen,
         settingsOpen,
       };
       window.history.pushState(
@@ -483,6 +496,7 @@ export default function App() {
     activeChatId,
     activeCommentsPostId,
     notificationsOpen,
+    foundersOpen,
     settingsOpen,
   ]);
 
@@ -511,7 +525,10 @@ export default function App() {
   const handleTabSelect = (tabId) => {
     triggerLightHaptic();
     if (tabId === activeTab) {
-      if (activeTab === 'home' && notificationsOpen) {
+      if (activeTab === 'home' && foundersOpen) {
+        setTransitionMode('pop');
+        setFoundersOpen(false);
+      } else if (activeTab === 'home' && notificationsOpen) {
         setTransitionMode('pop');
         setNotificationsOpen(false);
       } else if (activeTab === 'search' && brandDealsOpen) {
@@ -589,6 +606,7 @@ export default function App() {
     setActiveTab('home');
     setBrandDealsOpen(false);
     setSelectedDealId(null);
+    setFoundersOpen(false);
     setNotificationsOpen(false);
     setActiveChatId(null);
     setActiveCommentsPostId(null);
@@ -650,6 +668,7 @@ export default function App() {
     setBrandDealsOpen(false);
     setSelectedDealId(null);
     setSelectedDealObj(null);
+    setFoundersOpen(false);
     setNotificationsOpen(false);
     setActiveChatId(null);
     setActiveCommentsPostId(null);
@@ -722,13 +741,15 @@ export default function App() {
         : flowStep
       : activeTab === 'profile' && settingsOpen
         ? 'settings'
-        : activeTab === 'home' && notificationsOpen
-          ? 'notifications'
-          : activeTab === 'search' && brandDealsOpen && selectedDealId
-            ? `brand-deal-${selectedDealId}`
-            : activeTab === 'search' && brandDealsOpen
-              ? 'brand-deals'
-              : `tab-${activeTab}`;
+        : activeTab === 'home' && foundersOpen
+          ? 'founders'
+          : activeTab === 'home' && notificationsOpen
+            ? 'notifications'
+            : activeTab === 'search' && brandDealsOpen && selectedDealId
+              ? `brand-deal-${selectedDealId}`
+              : activeTab === 'search' && brandDealsOpen
+                ? 'brand-deals'
+                : `tab-${activeTab}`;
 
   return (
     <div className="viewport-stage">
@@ -842,6 +863,15 @@ export default function App() {
             activeTab={activeTab}
             onSelectTab={handleTabSelect}
           />
+        ) : activeTab === 'home' && foundersOpen ? (
+          <FoundersScreen
+            onBack={goBackInHistory}
+            onOpenChat={() => {
+              setFoundersOpen(false);
+              setTransitionMode('tab-right');
+              setActiveTab('chat');
+            }}
+          />
         ) : activeTab === 'home' && notificationsOpen ? (
           <NotificationsScreen
             notifications={notifications}
@@ -883,6 +913,10 @@ export default function App() {
             onOpenNotifications={() => {
               setTransitionMode('push');
               setNotificationsOpen(true);
+            }}
+            onOpenFounders={() => {
+              setTransitionMode('push');
+              setFoundersOpen(true);
             }}
             onOpenProfile={() => handleTabSelect('profile')}
             activeCommentsPostId={activeCommentsPostId}

@@ -98,6 +98,7 @@ export default function HomeFeedScreen({
   currentUser,
   unreadNotifications,
   onOpenNotifications,
+  onOpenFounders,
   onOpenProfile,
   activeCommentsPostId,
   onOpenComments,
@@ -545,8 +546,12 @@ export default function HomeFeedScreen({
                     }`}
                     onClick={() => {
                       triggerLightHaptic();
-                      setFeedMode(mode);
                       setFeedMenuOpen(false);
+                      if (mode === 'Founders') {
+                        onOpenFounders?.();
+                        return;
+                      }
+                      setFeedMode(mode);
                     }}
                   >
                     {mode}
