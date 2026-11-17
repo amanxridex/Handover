@@ -25,6 +25,7 @@ import {
 } from './data/brandsData';
 import ChatScreen from './components/ChatScreen';
 import BottomNav from './components/BottomNav';
+import BrandDealsScreen from './components/BrandDealsScreen';
 import HomeFeedScreen from './components/HomeFeedScreen';
 import NotificationsScreen from './components/NotificationsScreen';
 import OnboardingScreen from './components/OnboardingScreen';
@@ -151,7 +152,9 @@ function routeForSnapshot(snap) {
   if (snap.activeTab === 'chat') {
     return snap.activeChatId ? `/chat/${snap.activeChatId}` : '/chat';
   }
-  if (snap.activeTab === 'search') return '/search';
+  if (snap.activeTab === 'search') {
+    return snap.brandDealsOpen ? '/deals' : '/search';
+  }
   if (snap.activeTab === 'profile') {
     return snap.settingsOpen ? '/settings' : '/profile';
   }
@@ -164,7 +167,7 @@ function snapshotFromPathname(pathname, alreadyOnboarded) {
     flowStep: alreadyOnboarded ? 'main' : 'onboarding',
     roleSubStep: 'role',
     activeTab: 'home',
-    offerOpen: false,
+    brandDealsOpen: false,
     hasPostModal: false,
     activeChatId: null,
     activeCommentsPostId: null,
@@ -202,6 +205,9 @@ function snapshotFromPathname(pathname, alreadyOnboarded) {
       activeTab: 'chat',
       activeChatId: path.slice('/chat/'.length) || null,
     };
+  }
+  if (path === '/deals') {
+    return { ...base, flowStep: 'main', activeTab: 'search', brandDealsOpen: true };
   }
   if (path === '/search') return { ...base, flowStep: 'main', activeTab: 'search' };
   if (path === '/settings') {
@@ -255,7 +261,9 @@ export default function App() {
       ? { ...USER_PROFILES[0], name: initialStored.setupData.name }
       : USER_PROFILES[0]
   );
-  const [offerOpen, setOfferOpen] = useState(false);
+  const [brandDealsOpen, setBrandDealsOpen] = useState(
+    Boolean(initialRouteSnap.brandDealsOpen)
+  );
   const [selectedPost, setSelectedPost] = useState(null);
   const [activeChatId, setActiveChatId] = useState(initialRouteSnap.activeChatId);
   const [activeCommentsPostId, setActiveCommentsPostId] = useState(
@@ -283,7 +291,7 @@ export default function App() {
       flowStep,
       roleSubStep,
       activeTab,
-      offerOpen,
+      brandDealsOpen,
       hasPostModal: Boolean(selectedPost),
       activeChatId,
       activeCommentsPostId,
@@ -294,7 +302,7 @@ export default function App() {
       flowStep,
       roleSubStep,
       activeTab,
-      offerOpen,
+      brandDealsOpen,
       selectedPost,
       activeChatId,
       activeCommentsPostId,
@@ -401,7 +409,7 @@ export default function App() {
         setFlowStep(target.flowStep);
         setRoleSubStep(target.roleSubStep || 'role');
         setActiveTab(target.activeTab || 'home');
-        setOfferOpen(Boolean(target.offerOpen));
+        setBrandDealsOpen(Boolean(target.brandDealsOpen));
         if (!target.hasPostModal) {
           setSelectedPost(null);
         }
@@ -426,7 +434,7 @@ export default function App() {
         flowStep,
         roleSubStep,
         activeTab,
-        offerOpen,
+        brandDealsOpen,
         hasPostModal: Boolean(selectedPost),
         activeChatId,
         activeCommentsPostId,
@@ -446,7 +454,7 @@ export default function App() {
     flowStep,
     roleSubStep,
     activeTab,
-    offerOpen,
+    brandDealsOpen,
     selectedPost,
     activeChatId,
     activeCommentsPostId,
@@ -482,6 +490,9 @@ export default function App() {
       if (activeTab === 'home' && notificationsOpen) {
         setTransitionMode('pop');
         setNotificationsOpen(false);
+      } else if (activeTab === 'search' && brandDealsOpen) {
+        setTransitionMode('pop');
+        setBrandDealsOpen(false);
       } else if (activeTab === 'profile' && settingsOpen) {
         setTransitionMode('pop');
         setSettingsOpen(false);
@@ -491,6 +502,9 @@ export default function App() {
     const nextIdx = TAB_ORDER[tabId] ?? 0;
     const prevIdx = TAB_ORDER[activeTab] ?? 0;
     setTransitionMode(nextIdx > prevIdx ? 'tab-right' : 'tab-left');
+    if (tabId !== 'search') {
+      setBrandDealsOpen(false);
+    }
     setActiveTab(tabId);
   };
 
@@ -500,7 +514,7 @@ export default function App() {
 
   const handleBack = () => {
     triggerLightHaptic();
-    if (offerOpen) {
+    if (brandDealsOpen) {
       goBackInHistory();
       return;
     }
@@ -530,7 +544,7 @@ export default function App() {
       flowStep: 'main',
       roleSubStep: 'role',
       activeTab: 'home',
-      offerOpen: false,
+      brandDealsOpen: false,
       hasPostModal: false,
       activeChatId: null,
       activeCommentsPostId: null,
@@ -543,6 +557,7 @@ export default function App() {
     window.history.pushState({ handoverNav: mainRoot }, '', '/home');
 
     setActiveTab('home');
+    setBrandDealsOpen(false);
     setNotificationsOpen(false);
     setActiveChatId(null);
     setActiveCommentsPostId(null);
@@ -601,6 +616,7 @@ export default function App() {
     setRoleDetails(null);
     setRoleSubStep('role');
     setActiveTab('home');
+    setBrandDealsOpen(false);
     setNotificationsOpen(false);
     setActiveChatId(null);
     setActiveCommentsPostId(null);
@@ -609,7 +625,7 @@ export default function App() {
       flowStep: 'onboarding',
       roleSubStep: 'role',
       activeTab: 'home',
-      offerOpen: false,
+      brandDealsOpen: false,
       hasPostModal: false,
       activeChatId: null,
       activeCommentsPostId: null,
@@ -674,7 +690,9 @@ export default function App() {
         ? 'settings'
         : activeTab === 'home' && notificationsOpen
           ? 'notifications'
-          : `tab-${activeTab}`;
+          : activeTab === 'search' && brandDealsOpen
+            ? 'brand-deals'
+            : `tab-${activeTab}`;
 
   return (
     <div className="viewport-stage">
@@ -847,6 +865,13 @@ export default function App() {
             onOpenThread={(id) => setActiveChatId(id)}
             onCloseThread={goBackInHistory}
           />
+        ) : activeTab === 'search' && brandDealsOpen ? (
+          <BrandDealsScreen
+            onBack={goBackInHistory}
+            tabs={TABS}
+            activeTab={activeTab}
+            onSelectTab={handleTabSelect}
+          />
         ) : (
           <>
             <div className="screen-content">
@@ -946,7 +971,8 @@ export default function App() {
                   className="promo-card"
                   onClick={() => {
                     triggerLightHaptic();
-                    setOfferOpen(true);
+                    setTransitionMode('push');
+                    setBrandDealsOpen(true);
                   }}
                 >
                   <div>
@@ -964,37 +990,6 @@ export default function App() {
                 onSelectTab={handleTabSelect}
               />
             </div>
-
-            {/* Offer Details Bottom Sheet */}
-            {offerOpen && (
-              <div
-                className="offer-backdrop"
-                role="dialog"
-                aria-modal="true"
-                aria-label={activePromo.title}
-                onClick={goBackInHistory}
-              >
-                <div className="offer-sheet" onClick={(e) => e.stopPropagation()}>
-                  <div className="sheet-handle" />
-                  <h2 className="offer-sheet-title">{activePromo.title}</h2>
-                  <p className="offer-sheet-sub">{activePromo.subtitle}</p>
-                  <p className="offer-sheet-desc">
-                    Pay with any linked card in {selectedUser.name}&apos;s wallet to earn
-                    bonus miles automatically at checkout.
-                  </p>
-                  <button
-                    type="button"
-                    className="offer-cta"
-                    onClick={() => {
-                      triggerLightHaptic();
-                      goBackInHistory();
-                    }}
-                  >
-                    Activate offer
-                  </button>
-                </div>
-              </div>
-            )}
           </>
         )}
         </div>

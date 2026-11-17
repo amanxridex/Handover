@@ -5817,3 +5817,221 @@ button,
     animation: none;
   }
 }
+
+/* ================================
+   Brand Deals Discovery Screen
+================================ */
+.deals-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(180deg, #061437 0%, #050b1c 42%, #040712 100%);
+  color: #ffffff;
+  overflow: hidden;
+}
+
+.deals-scroll {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  padding: max(env(safe-area-inset-top, 0px), 18px) 16px
+    calc(max(env(safe-area-inset-bottom, 0px), 16px) + 92px);
+}
+
+.deals-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.deals-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  height: 40px;
+  margin-bottom: 18px;
+}
+
+.deals-back-btn {
+  background: #0d1c42;
+  border: 1px solid rgba(59, 130, 246, 0.28);
+  color: #ffffff;
+}
+
+.deals-header-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+.deals-header-spacer {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+
+.deals-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.deals-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding: 0 2px;
+}
+
+.deals-section-title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+.deals-view-all-btn {
+  border: none;
+  background: transparent;
+  color: #93c5fd;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 2px;
+  cursor: pointer;
+}
+
+.deals-view-all-btn:active {
+  transform: scale(0.95);
+  opacity: 0.78;
+}
+
+.deals-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.deal-card {
+  position: relative;
+  width: 100%;
+  min-height: 158px;
+  border-radius: 16px;
+  background: #0b142c;
+  border: 1px solid rgba(59, 130, 246, 0.18);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.34);
+  padding: 14px 12px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  text-align: center;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.14s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.deal-card:active {
+  transform: scale(0.97);
+}
+
+.deal-amount-pill {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: #1a66ff;
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  padding: 6px 11px;
+  border-radius: 9999px;
+}
+
+.deal-logo-stage {
+  margin-top: 26px;
+  height: 54px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+}
+
+.brand-logo-lockup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-logo-uniqlo {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  background: #ed1c24;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: 0.06em;
+}
+
+.brand-logo-fallback {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  color: currentColor;
+}
+
+.deal-brand-name {
+  margin-top: 10px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+/* Light Mode: Brand Deals Screen */
+[data-theme='light'] .deals-screen {
+  background: linear-gradient(180deg, #e0f2fe 0%, #f8fafc 34%, #f8fafc 100%);
+  color: #0f172a;
+}
+
+[data-theme='light'] .deals-back-btn {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.12);
+  color: #0f172a;
+}
+
+[data-theme='light'] .deals-header-title,
+[data-theme='light'] .deals-section-title,
+[data-theme='light'] .deal-brand-name,
+[data-theme='light'] .deal-logo-stage {
+  color: #0f172a;
+}
+
+[data-theme='light'] .deals-view-all-btn {
+  color: #475569;
+}
+
+[data-theme='light'] .deal-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
