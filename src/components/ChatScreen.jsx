@@ -11,7 +11,6 @@ import {
   BackChevronIcon,
   ChevronDownIcon,
   PaperPlaneIcon,
-  PhoneIcon,
   UserInfoIcon,
 } from './Icons';
 
@@ -269,17 +268,6 @@ export default function ChatScreen({
             </div>
 
             <div className="chat-thread-actions">
-              <button
-                type="button"
-                className="chat-thread-pill-btn"
-                onClick={() => {
-                  triggerLightHaptic();
-                  showToast(`Calling ${firstName}...`);
-                }}
-                aria-label={`Call ${activeThread.name}`}
-              >
-                <PhoneIcon />
-              </button>
               <button
                 type="button"
                 className="chat-thread-pill-btn"
