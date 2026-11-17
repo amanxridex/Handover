@@ -7286,10 +7286,16 @@ button,
   gap: 12px;
   margin: 0 -16px 18px;
   padding: 0 16px;
+  scroll-padding-inline: 16px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+}
+
+.creators-hero-rail::after {
+  content: '';
+  flex: 0 0 4px;
 }
 
 .creators-hero-rail::-webkit-scrollbar {
@@ -7298,8 +7304,8 @@ button,
 
 .creators-hero-card {
   position: relative;
-  width: 86%;
-  min-width: 86%;
+  width: 79%;
+  min-width: 79%;
   height: 244px;
   border: none;
   border-radius: 22px;
