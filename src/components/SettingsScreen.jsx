@@ -1,6 +1,10 @@
 import React, { useMemo, useRef, useState } from 'react';
 import avatarDefault from '../assets/avatar-default.jpg';
 import {
+  getNotificationPermission,
+  requestNotificationPermissionAndRegister,
+} from '../services/nativeNotifySender';
+import {
   enrollBiometricPasskey,
   isPlatformBiometricAvailable,
   submitUserFeedback,
@@ -231,6 +235,7 @@ export default function SettingsScreen({
   const [activeSheet, setActiveSheet] = useState(null); // null | edit-profile | passcode | plan | badges | preferences | privacy | support | feedback | language
   const [passcodeSetupOpen, setPasscodeSetupOpen] = useState(false);
   const [pendingBioEnable, setPendingBioEnable] = useState(false);
+  const [osNotifPerm, setOsNotifPerm] = useState(() => getNotificationPermission());
   const [toastMsg, setToastMsg] = useState('');
 
   // Edit profile form state
@@ -1001,7 +1006,12 @@ export default function SettingsScreen({
                   {
                     key: 'notificationsEnabled',
                     label: 'Push Notifications',
-                    desc: 'Likes, replies, and new follower alerts',
+                    desc:
+                      osNotifPerm === 'granted'
+                        ? 'Likes, comments, follows & messages · OS Alerts Allowed'
+                        : osNotifPerm === 'denied'
+                          ? 'In-app alerts active · Browser OS notifications blocked'
+                          : 'Likes, comments, follows & messages · Tap to allow OS alerts',
                   },
                   {
                     key: 'privateAccount',
@@ -1018,28 +1028,41 @@ export default function SettingsScreen({
                     label: 'Show Active Status',
                     desc: 'Let chats know when you were recently active',
                   },
-                ].map((item) => (
-                  <div
-                    key={item.key}
-                    className="settings-pref-row"
-                    onClick={async () => {
-                      triggerLightHaptic();
-                      await onUpdateSettings({
-                        [item.key]: !settings[item.key],
+                ].map((item) => {
+                  const handleTogglePref = async (nextVal) => {
+                    triggerLightHaptic();
+                    await onUpdateSettings({ [item.key]: nextVal });
+                    if (item.key === 'notificationsEnabled' && nextVal) {
+                      const perm = await requestNotificationPermissionAndRegister({
+                        sendWelcome: getNotificationPermission() !== 'granted',
                       });
-                    }}
-                  >
-                    <div>
-                      <div className="settings-pref-title">{item.label}</div>
-                      <div className="settings-pref-desc">{item.desc}</div>
+                      setOsNotifPerm(perm);
+                      if (perm === 'denied') {
+                        showToast('Allow notifications in browser settings for OS alerts');
+                      } else if (perm === 'granted') {
+                        showToast('Notifications enabled');
+                      }
+                    }
+                  };
+
+                  return (
+                    <div
+                      key={item.key}
+                      className="settings-pref-row"
+                      onClick={() => handleTogglePref(!settings[item.key])}
+                    >
+                      <div>
+                        <div className="settings-pref-title">{item.label}</div>
+                        <div className="settings-pref-desc">{item.desc}</div>
+                      </div>
+                      <ToggleSwitch
+                        checked={Boolean(settings[item.key])}
+                        onChange={handleTogglePref}
+                        label={item.label}
+                      />
                     </div>
-                    <ToggleSwitch
-                      checked={Boolean(settings[item.key])}
-                      onChange={(val) => onUpdateSettings({ [item.key]: val })}
-                      label={item.label}
-                    />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 

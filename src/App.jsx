@@ -22,6 +22,10 @@ import CreatePostScreen from './components/CreatePostScreen';
 import CreatorsScreen from './components/CreatorsScreen';
 import FoundersScreen from './components/FoundersScreen';
 import HomeFeedScreen from './components/HomeFeedScreen';
+import {
+  LiveNotificationBanner,
+  NotificationPermissionPrompt,
+} from './components/NotificationOverlay';
 import NotificationsScreen from './components/NotificationsScreen';
 import OnboardingScreen from './components/OnboardingScreen';
 import PasscodeLockScreen from './components/PasscodeLockScreen';
@@ -46,6 +50,17 @@ import {
   markNotificationReadInDb,
   subscribeRealtimeChannel,
 } from './services/notificationsService';
+import { fetchMyDirectThreads } from './services/chatService';
+import {
+  buildActivityAlert,
+  buildDmAlert,
+  dismissNotificationPrompt,
+  getNotificationPermission,
+  requestNotificationPermissionAndRegister,
+  sendOsNotification,
+  shouldShowNotificationPrompt,
+  syncDevicePushSubscription,
+} from './services/nativeNotifySender';
 import {
   clearStoredSettings,
   DEFAULT_SETTINGS,
@@ -270,6 +285,9 @@ export default function App() {
     initialRouteSnap.createPage || null
   );
   const [notifications, setNotifications] = useState([]);
+  const [showNotifPrompt, setShowNotifPrompt] = useState(false);
+  const [notifPromptBusy, setNotifPromptBusy] = useState(false);
+  const [liveAlert, setLiveAlert] = useState(null);
   const [exitHint, setExitHint] = useState(false);
   const [transitionMode, setTransitionMode] = useState('none'); // none | push | pop | tab-right | tab-left
 
@@ -277,38 +295,211 @@ export default function App() {
   const historyReadyRef = useRef(false);
   const lastRootBackRef = useRef(0);
   const exitTimerRef = useRef(null);
+  const seenNotifIdsRef = useRef(new Set());
+  const notifHydratedRef = useRef(false);
+  const seenDmIdsRef = useRef(new Set());
+  const dmHydratedRef = useRef(false);
+  const liveAlertTimerRef = useRef(null);
+  const settingsRef = useRef(settings);
+  const activeTabRef = useRef(activeTab);
+  const activeChatRef = useRef(activeChatId);
+
+  settingsRef.current = settings;
+  activeTabRef.current = activeTab;
+  activeChatRef.current = activeChatId;
 
   const unreadNotifications = useMemo(
     () => notifications.filter((n) => n.unread).length,
     [notifications]
   );
 
+  const navigateFromNotification = useCallback((url, peer = null) => {
+    const cleanUrl = String(url || '/notifications');
+    setTransitionMode('push');
+    if (cleanUrl.startsWith('/chat/')) {
+      const chatPeerId = cleanUrl.slice('/chat/'.length);
+      setNotificationsOpen(false);
+      setSettingsOpen(false);
+      if (peer) setActiveChatPeer(peer);
+      setActiveChatId(chatPeerId || null);
+      setActiveTab('chat');
+      return;
+    }
+    setActiveChatId(null);
+    setSettingsOpen(false);
+    setFoundersOpen(false);
+    setCreatorsOpen(false);
+    setCreatePage(null);
+    setActiveTab('home');
+    setNotificationsOpen(true);
+  }, []);
+
+  const dispatchIncomingAlert = useCallback(
+    (alert) => {
+      if (!alert || settingsRef.current?.notificationsEnabled === false) return;
+      if (
+        alert.kind === 'message' &&
+        activeTabRef.current === 'chat' &&
+        activeChatRef.current === alert.peer?.id &&
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'visible'
+      ) {
+        return;
+      }
+
+      triggerLightHaptic();
+      setLiveAlert(alert);
+      if (liveAlertTimerRef.current) clearTimeout(liveAlertTimerRef.current);
+      liveAlertTimerRef.current = setTimeout(() => {
+        setLiveAlert(null);
+      }, 4800);
+
+      if (getNotificationPermission() === 'granted') {
+        sendOsNotification({
+          title: alert.title,
+          body: alert.body,
+          icon: alert.avatar || '/icon-192.png',
+          tag: alert.tag,
+          url: alert.url,
+          onFallbackClick: (targetUrl) =>
+            navigateFromNotification(targetUrl, alert.peer || null),
+        });
+      }
+    },
+    [navigateFromNotification]
+  );
+
   const refreshNotifications = useCallback(async () => {
     if (!profileId) {
+      seenNotifIdsRef.current = new Set();
+      notifHydratedRef.current = false;
       setNotifications([]);
       return;
     }
     const rows = await fetchMyNotifications();
-    if (Array.isArray(rows)) {
-      setNotifications(rows);
+    if (!Array.isArray(rows)) return;
+
+    if (!notifHydratedRef.current) {
+      rows.forEach((row) => seenNotifIdsRef.current.add(row.id));
+      notifHydratedRef.current = true;
+    } else {
+      const unseen = rows.filter(
+        (row) => row.unread && !seenNotifIdsRef.current.has(row.id)
+      );
+      rows.forEach((row) => seenNotifIdsRef.current.add(row.id));
+      if (unseen.length > 0) {
+        dispatchIncomingAlert(buildActivityAlert(unseen[0]));
+      }
     }
+
+    setNotifications(rows);
+  }, [profileId, dispatchIncomingAlert]);
+
+  const refreshGlobalIncomingDms = useCallback(async () => {
+    if (!profileId) {
+      seenDmIdsRef.current = new Set();
+      dmHydratedRef.current = false;
+      return;
+    }
+
+    const threads = await fetchMyDirectThreads();
+    if (!Array.isArray(threads)) return;
+
+    if (!dmHydratedRef.current) {
+      threads.forEach((t) => {
+        if (t.lastMessageId) seenDmIdsRef.current.add(t.lastMessageId);
+      });
+      dmHydratedRef.current = true;
+      return;
+    }
+
+    const freshIncoming = threads.filter(
+      (t) =>
+        t.lastMessageId &&
+        !seenDmIdsRef.current.has(t.lastMessageId) &&
+        t.lastSenderId &&
+        t.lastSenderId !== profileId
+    );
+    threads.forEach((t) => {
+      if (t.lastMessageId) seenDmIdsRef.current.add(t.lastMessageId);
+    });
+
+    if (freshIncoming.length > 0) {
+      dispatchIncomingAlert(buildDmAlert(freshIncoming[0]));
+    }
+  }, [profileId, dispatchIncomingAlert]);
+
+  // Reset baseline hydration when signed-in profile changes
+  useEffect(() => {
+    seenNotifIdsRef.current = new Set();
+    notifHydratedRef.current = false;
+    seenDmIdsRef.current = new Set();
+    dmHydratedRef.current = false;
   }, [profileId]);
 
+  // Listen globally for incoming notifications & direct messages across all tabs
   useEffect(() => {
     refreshNotifications();
+    refreshGlobalIncomingDms();
     if (!profileId) return undefined;
 
-    const unsubscribe = subscribeRealtimeChannel(
+    const unsubNotif = subscribeRealtimeChannel(
       `notif:${profileId}`,
       'new_notification',
       refreshNotifications
     );
-    const timer = setInterval(refreshNotifications, 6000);
+    const unsubDm = subscribeRealtimeChannel(
+      `dm:${profileId}`,
+      'new_dm',
+      refreshGlobalIncomingDms
+    );
+
+    const timer = setInterval(() => {
+      refreshNotifications();
+      refreshGlobalIncomingDms();
+    }, 4500);
+
     return () => {
-      unsubscribe();
+      unsubNotif();
+      unsubDm();
       clearInterval(timer);
     };
-  }, [profileId, notificationsOpen, refreshNotifications]);
+  }, [
+    profileId,
+    notificationsOpen,
+    refreshNotifications,
+    refreshGlobalIncomingDms,
+  ]);
+
+  // Ask signed-in user once to allow native OS notifications + handle SW notification clicks
+  useEffect(() => {
+    if (!profileId || flowStep !== 'main' || showSplash) return undefined;
+    if (getNotificationPermission() === 'granted') {
+      syncDevicePushSubscription();
+      return undefined;
+    }
+    if (
+      settings.notificationsEnabled !== false &&
+      shouldShowNotificationPrompt()
+    ) {
+      const timer = setTimeout(() => setShowNotifPrompt(true), 1200);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [profileId, flowStep, showSplash, settings.notificationsEnabled]);
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return undefined;
+    const onSwMessage = (event) => {
+      if (event.data?.type === 'NAVIGATE_TO' && event.data?.url) {
+        navigateFromNotification(event.data.url);
+      }
+    };
+    navigator.serviceWorker.addEventListener('message', onSwMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', onSwMessage);
+    };
+  }, [navigateFromNotification]);
 
   const navSnapshot = useMemo(
     () => ({
@@ -1294,25 +1485,41 @@ export default function App() {
         )}
         </div>
 
+        <LiveNotificationBanner
+          alert={liveAlert}
+          onTap={(alert) => {
+            setLiveAlert(null);
+            navigateFromNotification(alert.url, alert.peer || null);
+          }}
+          onDismiss={() => setLiveAlert(null)}
+        />
+
+        <NotificationPermissionPrompt
+          open={showNotifPrompt && !appLocked && !showSplash}
+          busy={notifPromptBusy}
+          onAllow={async () => {
+            triggerLightHaptic();
+            setNotifPromptBusy(true);
+            const perm = await requestNotificationPermissionAndRegister({
+              sendWelcome: true,
+            });
+            setNotifPromptBusy(false);
+            setShowNotifPrompt(false);
+            if (perm === 'granted') {
+              handleUpdateSettings({ notificationsEnabled: true });
+            }
+          }}
+          onDismiss={() => {
+            triggerLightHaptic();
+            dismissNotificationPrompt();
+            setShowNotifPrompt(false);
+          }}
+        />
+
         {exitHint && (
           <div className="app-exit-toast" role="status">
             Swipe back again to exit
           </div>
-        )}
-
-        {appLocked && !showSplash && settings.hasPasscode && (
-          <PasscodeLockScreen
-            mode="unlock"
-            user={{
-              name: selectedUser.name,
-              username: setupData.username,
-              avatar: setupData.avatar,
-            }}
-            storedPasscodeHash={settings.passcodeHash}
-            biometricCredentialId={settings.biometricCredentialId}
-            onUnlocked={() => setAppLocked(false)}
-            onForgotLogout={handleLogout}
-          />
         )}
 
         {appLocked && !showSplash && settings.hasPasscode && (
