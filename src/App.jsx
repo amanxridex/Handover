@@ -56,9 +56,9 @@ import {
   buildDmAlert,
   dismissNotificationPrompt,
   getNotificationPermission,
+  getNotificationPromptState,
   requestNotificationPermissionAndRegister,
   sendOsNotification,
-  shouldShowNotificationPrompt,
   syncDevicePushSubscription,
 } from './services/nativeNotifySender';
 import {
@@ -285,7 +285,7 @@ export default function App() {
     initialRouteSnap.createPage || null
   );
   const [notifications, setNotifications] = useState([]);
-  const [showNotifPrompt, setShowNotifPrompt] = useState(false);
+  const [notifPromptMode, setNotifPromptMode] = useState(null); // null | 'permission' | 'ios-install'
   const [notifPromptBusy, setNotifPromptBusy] = useState(false);
   const [liveAlert, setLiveAlert] = useState(null);
   const [exitHint, setExitHint] = useState(false);
@@ -446,12 +446,39 @@ export default function App() {
     const unsubNotif = subscribeRealtimeChannel(
       `notif:${profileId}`,
       'new_notification',
-      refreshNotifications
+      () => {
+        refreshNotifications();
+      }
     );
     const unsubDm = subscribeRealtimeChannel(
       `dm:${profileId}`,
       'new_dm',
-      refreshGlobalIncomingDms
+      (payload) => {
+        if (
+          payload?.id &&
+          payload?.senderId &&
+          payload.senderId !== profileId &&
+          !seenDmIdsRef.current.has(payload.id)
+        ) {
+          seenDmIdsRef.current.add(payload.id);
+          dispatchIncomingAlert({
+            id: `dm-${payload.id}`,
+            kind: 'message',
+            label: 'Message',
+            title: payload.senderName || 'New Message',
+            body: payload.text || 'Sent you a message',
+            avatar: payload.senderAvatar || '',
+            peer: {
+              id: payload.senderId,
+              name: payload.senderName || 'Member',
+              avatar: payload.senderAvatar || '',
+            },
+            url: `/chat/${payload.senderId}`,
+            tag: `dm-${payload.senderId}`,
+          });
+        }
+        refreshGlobalIncomingDms();
+      }
     );
 
     const timer = setInterval(() => {
@@ -467,22 +494,21 @@ export default function App() {
   }, [
     profileId,
     notificationsOpen,
+    dispatchIncomingAlert,
     refreshNotifications,
     refreshGlobalIncomingDms,
   ]);
 
-  // Ask signed-in user once to allow native OS notifications + handle SW notification clicks
+  // Ask signed-in user once to allow native OS notifications + register APNs/FCM push
   useEffect(() => {
     if (!profileId || flowStep !== 'main' || showSplash) return undefined;
     if (getNotificationPermission() === 'granted') {
       syncDevicePushSubscription();
       return undefined;
     }
-    if (
-      settings.notificationsEnabled !== false &&
-      shouldShowNotificationPrompt()
-    ) {
-      const timer = setTimeout(() => setShowNotifPrompt(true), 1200);
+    const promptState = getNotificationPromptState();
+    if (settings.notificationsEnabled !== false && promptState.show) {
+      const timer = setTimeout(() => setNotifPromptMode(promptState.mode), 1200);
       return () => clearTimeout(timer);
     }
     return undefined;
@@ -1517,7 +1543,8 @@ export default function App() {
         />
 
         <NotificationPermissionPrompt
-          open={showNotifPrompt && !appLocked && !showSplash}
+          open={Boolean(notifPromptMode) && !appLocked && !showSplash}
+          mode={notifPromptMode || 'permission'}
           busy={notifPromptBusy}
           onAllow={async () => {
             triggerLightHaptic();
@@ -1526,7 +1553,7 @@ export default function App() {
               sendWelcome: true,
             });
             setNotifPromptBusy(false);
-            setShowNotifPrompt(false);
+            setNotifPromptMode(null);
             if (perm === 'granted') {
               handleUpdateSettings({ notificationsEnabled: true });
             }
@@ -1534,7 +1561,7 @@ export default function App() {
           onDismiss={() => {
             triggerLightHaptic();
             dismissNotificationPrompt();
-            setShowNotifPrompt(false);
+            setNotifPromptMode(null);
           }}
         />
 

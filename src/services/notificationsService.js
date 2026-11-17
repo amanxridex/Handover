@@ -1,5 +1,6 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { getStoredSessionToken } from './profileService';
+import { sendPriorityPushToRecipient } from './nativeNotifySender';
+import { getStoredOnboardingState, getStoredSessionToken } from './profileService';
 import {
   broadcastRealtimeEvent,
   subscribeRealtimeChannel,
@@ -125,9 +126,37 @@ export async function createActivityNotification({
     }
 
     if (data.recipientId) {
+      const me = getStoredOnboardingState();
+      const actorId = me?.profileId || '';
+      const actorName =
+        me?.setupData?.name || me?.setupData?.username || 'Someone';
+      const actorAvatar = me?.setupData?.avatar || '';
+
       broadcastRealtimeEvent(`notif:${data.recipientId}`, 'new_notification', {
         type,
         postId,
+        commentText,
+        actorId,
+        actorName,
+        actorAvatar,
+      });
+
+      const bodyText =
+        type === 'comment'
+          ? commentText
+            ? `commented: "${commentText}"`
+            : 'commented on your post'
+          : type === 'follow'
+            ? 'started following you'
+            : 'liked your post';
+
+      sendPriorityPushToRecipient({
+        recipientId: data.recipientId,
+        title: actorName,
+        body: bodyText,
+        url: '/notifications',
+        tag: `${type}-${postId || actorId || data.recipientId}`,
+        icon: actorAvatar,
       });
     }
 

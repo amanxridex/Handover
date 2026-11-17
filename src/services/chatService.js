@@ -1,5 +1,6 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { getStoredSessionToken } from './profileService';
+import { sendPriorityPushToRecipient } from './nativeNotifySender';
+import { getStoredOnboardingState, getStoredSessionToken } from './profileService';
 import { broadcastRealtimeEvent } from './realtimeService';
 
 const UUID_RE =
@@ -130,10 +131,28 @@ export async function sendDirectMessage(recipientId, text) {
       };
     }
 
+    const actor = getStoredOnboardingState();
+    const senderId = actor?.profileId || '';
+    const senderName =
+      actor?.setupData?.name || actor?.setupData?.username || 'New Message';
+    const senderAvatar = actor?.setupData?.avatar || '';
+
     broadcastRealtimeEvent(`dm:${recipientId}`, 'new_dm', {
       id: data.message.id,
+      senderId,
+      senderName,
+      senderAvatar,
       text: data.message.text,
       createdAt: data.message.createdAt,
+    });
+
+    sendPriorityPushToRecipient({
+      recipientId,
+      title: senderName,
+      body: data.message.text,
+      url: senderId ? `/chat/${senderId}` : '/chat',
+      tag: senderId ? `dm-${senderId}` : `dm-${recipientId}`,
+      icon: senderAvatar,
     });
 
     return {

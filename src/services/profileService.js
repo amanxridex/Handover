@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { sendPriorityPushToRecipient } from './nativeNotifySender';
 import { broadcastRealtimeEvent } from './realtimeService';
 
 const STORAGE_KEY = 'handover_profile_v1';
@@ -463,8 +464,26 @@ export async function toggleFollowProfile(targetProfileId) {
       };
     }
     if (Boolean(data.following)) {
+      const me = getStoredOnboardingState();
+      const actorId = me?.profileId || '';
+      const actorName =
+        me?.setupData?.name || me?.setupData?.username || 'Someone';
+      const actorAvatar = me?.setupData?.avatar || '';
+
       broadcastRealtimeEvent(`notif:${targetProfileId}`, 'new_notification', {
         type: 'follow',
+        actorId,
+        actorName,
+        actorAvatar,
+      });
+
+      sendPriorityPushToRecipient({
+        recipientId: targetProfileId,
+        title: actorName,
+        body: 'started following you',
+        url: '/notifications',
+        tag: `follow-${actorId || targetProfileId}`,
+        icon: actorAvatar,
       });
     }
     return {

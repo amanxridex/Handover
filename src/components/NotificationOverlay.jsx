@@ -4,11 +4,14 @@ import { BellIcon } from './Icons';
 
 export function NotificationPermissionPrompt({
   open,
+  mode = 'permission',
   busy = false,
   onAllow,
   onDismiss,
 }) {
   if (!open) return null;
+
+  const isIosInstall = mode === 'ios-install';
 
   return (
     <div
@@ -22,30 +25,45 @@ export function NotificationPermissionPrompt({
           <BellIcon />
         </div>
         <h2 id="notif-perm-title" className="notif-perm-title">
-          Turn on notifications
+          {isIosInstall
+            ? 'Enable iOS Push Notifications'
+            : 'Turn on notifications'}
         </h2>
         <p className="notif-perm-desc">
-          Allow real-time alerts so you know right away when someone likes your
-          post, comments, follows you, or sends a message.
+          {isIosInstall
+            ? 'To receive real-time APNs alerts on iPhone & iPad for messages, likes, comments, and followers: tap the Share button in Safari, choose "Add to Home Screen", then open Handover from your Home Screen.'
+            : 'Allow priority real-time alerts so you know the millisecond someone likes your post, comments, follows you, or sends a message.'}
         </p>
 
         <div className="notif-perm-actions">
-          <button
-            type="button"
-            className="notif-perm-allow-btn"
-            onClick={onAllow}
-            disabled={busy}
-          >
-            {busy ? 'Enabling...' : 'Allow Notifications'}
-          </button>
-          <button
-            type="button"
-            className="notif-perm-later-btn"
-            onClick={onDismiss}
-            disabled={busy}
-          >
-            Not now
-          </button>
+          {isIosInstall ? (
+            <button
+              type="button"
+              className="notif-perm-allow-btn"
+              onClick={onDismiss}
+            >
+              Got it
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="notif-perm-allow-btn"
+                onClick={onAllow}
+                disabled={busy}
+              >
+                {busy ? 'Enabling...' : 'Allow Notifications'}
+              </button>
+              <button
+                type="button"
+                className="notif-perm-later-btn"
+                onClick={onDismiss}
+                disabled={busy}
+              >
+                Not now
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

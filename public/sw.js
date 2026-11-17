@@ -33,10 +33,14 @@ self.addEventListener('message', (event) => {
 
   if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
     const p = event.data.payload || {};
+    const safeIcon =
+      p.icon && !(String(p.icon).startsWith('data:') && String(p.icon).length > 8192)
+        ? p.icon
+        : '/icon-192.png';
     event.waitUntil(
       self.registration.showNotification(p.title || 'Handover', {
         body: p.body || 'New activity on Handover',
-        icon: p.icon || '/icon-192.png',
+        icon: safeIcon,
         badge: '/icon-192.png',
         tag: p.tag || `handover-${Date.now()}`,
         renotify: true,
@@ -55,10 +59,15 @@ self.addEventListener('push', (event) => {
     payload = { body: event.data ? event.data.text() : 'New notification on Handover' };
   }
 
+  const safeIcon =
+    payload.icon &&
+    !(String(payload.icon).startsWith('data:') && String(payload.icon).length > 8192)
+      ? payload.icon
+      : '/icon-192.png';
   const title = payload.title || 'Handover';
   const options = {
     body: payload.body || 'You have new activity',
-    icon: payload.icon || '/icon-192.png',
+    icon: safeIcon,
     badge: '/icon-192.png',
     tag: payload.tag || `handover-push-${Date.now()}`,
     renotify: true,

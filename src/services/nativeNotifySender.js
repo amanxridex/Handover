@@ -1,10 +1,53 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { getStoredSessionToken } from './profileService';
 
 const PROMPT_STATE_KEY = 'handover_notif_prompt_v1';
+const SESSION_TOKEN_KEY = 'handover_session_token_v1';
+
+let cachedVapidPublicKey = '';
+
+function readSessionToken() {
+  try {
+    return window.localStorage.getItem(SESSION_TOKEN_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function isIosDevice() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const isTouchMac =
+    navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1;
+  return /iPad|iPhone|iPod/.test(ua) || isTouchMac;
+}
+
+export function isAndroidDevice() {
+  if (typeof navigator === 'undefined') return false;
+  return /Android/i.test(navigator.userAgent || '');
+}
+
+export function isStandalonePwa() {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.navigator?.standalone === true ||
+    Boolean(window.matchMedia?.('(display-mode: standalone)')?.matches)
+  );
+}
+
+export function detectPushPlatform() {
+  if (isIosDevice()) return isStandalonePwa() ? 'ios_pwa' : 'ios_safari';
+  if (isAndroidDevice()) {
+    return isStandalonePwa() ? 'android_pwa' : 'android_chrome';
+  }
+  return 'desktop_web';
+}
 
 export function isNotificationSupported() {
   return typeof window !== 'undefined' && 'Notification' in window;
+}
+
+export function needsIosHomeScreenInstall() {
+  return isIosDevice() && !isStandalonePwa() && !isNotificationSupported();
 }
 
 export function getNotificationPermission() {
@@ -12,14 +55,28 @@ export function getNotificationPermission() {
   return window.Notification.permission || 'default';
 }
 
-export function shouldShowNotificationPrompt() {
-  if (!isNotificationSupported()) return false;
-  if (getNotificationPermission() !== 'default') return false;
+export function getNotificationPromptState() {
   try {
-    return window.localStorage.getItem(PROMPT_STATE_KEY) !== 'dismissed';
+    if (window.localStorage.getItem(PROMPT_STATE_KEY) === 'dismissed') {
+      return { show: false, mode: null };
+    }
   } catch {
-    return true;
+    // Ignore storage error
   }
+
+  if (needsIosHomeScreenInstall()) {
+    return { show: true, mode: 'ios-install' };
+  }
+
+  if (isNotificationSupported() && getNotificationPermission() === 'default') {
+    return { show: true, mode: 'permission' };
+  }
+
+  return { show: false, mode: null };
+}
+
+export function shouldShowNotificationPrompt() {
+  return getNotificationPromptState().show;
 }
 
 export function dismissNotificationPrompt() {
@@ -41,37 +98,116 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
+async function fetchWebPushVapidKey() {
+  if (cachedVapidPublicKey) return cachedVapidPublicKey;
+
+  const envKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+  if (envKey) {
+    cachedVapidPublicKey = envKey;
+    return cachedVapidPublicKey;
+  }
+
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data } = await supabase.rpc('get_web_push_public_key');
+      if (typeof data === 'string' && data.length > 20) {
+        cachedVapidPublicKey = data;
+        return cachedVapidPublicKey;
+      }
+    } catch {
+      // Fallback to Edge Function bootstrap GET
+    }
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (supabaseUrl) {
+        const res = await fetch(`${supabaseUrl}/functions/v1/send-push`);
+        const json = await res.json();
+        if (json?.publicKey) {
+          cachedVapidPublicKey = json.publicKey;
+          return cachedVapidPublicKey;
+        }
+      }
+    } catch {
+      // Ignore fetch errors
+    }
+  }
+
+  return '';
+}
+
+async function getActiveServiceWorkerRegistration() {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+    return null;
+  }
+
+  try {
+    let reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) {
+      reg = await navigator.serviceWorker.register('/sw.js', {
+        updateViaCache: 'none',
+      });
+    }
+    const readyReg = await Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise((resolve) => setTimeout(() => resolve(reg), 3000)),
+    ]);
+    return readyReg || reg;
+  } catch {
+    return null;
+  }
+}
+
 export async function syncDevicePushSubscription() {
-  const token = getStoredSessionToken();
+  const token = readSessionToken();
   if (!token || !isSupabaseConfigured || !supabase) return;
   if (getNotificationPermission() !== 'granted') return;
 
-  let endpoint = `browser-notify:${navigator.userAgent?.slice(0, 120) || 'web'}`;
+  const platform = detectPushPlatform();
+  let endpoint = `browser-notify:${platform}:${navigator.userAgent?.slice(0, 80) || 'web'}`;
   let p256dh = '';
   let auth = '';
 
   try {
-    const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-    if (vapidKey && 'serviceWorker' in navigator && 'PushManager' in window) {
-      const reg = await navigator.serviceWorker.getRegistration();
-      if (reg?.pushManager) {
-        let sub = await reg.pushManager.getSubscription();
-        if (!sub) {
-          sub = await reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(vapidKey),
-          });
-        }
-        const json = sub.toJSON();
+    const vapidKey = await fetchWebPushVapidKey();
+    const reg = await getActiveServiceWorkerRegistration();
+    if (vapidKey && reg && 'PushManager' in window) {
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        });
+      }
+      const json = sub?.toJSON?.();
+      if (json?.endpoint && json?.keys?.p256dh && json?.keys?.auth) {
+        endpoint = json.endpoint;
+        p256dh = json.keys.p256dh;
+        auth = json.keys.auth;
+      }
+    }
+  } catch {
+    // Try clearing stale key mismatch subscription and re-subscribing once
+    try {
+      const vapidKey = await fetchWebPushVapidKey();
+      const reg = await getActiveServiceWorkerRegistration();
+      const existing = await reg?.pushManager?.getSubscription();
+      if (existing && vapidKey) {
+        await existing.unsubscribe();
+        const fresh = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        });
+        const json = fresh?.toJSON?.();
         if (json?.endpoint) {
           endpoint = json.endpoint;
           p256dh = json.keys?.p256dh || '';
           auth = json.keys?.auth || '';
         }
       }
+    } catch {
+      // Browser Notification API remains active even if PushManager is restricted
     }
-  } catch {
-    // Web Push optional when VAPID key is absent; browser Notification API still active
   }
 
   try {
@@ -80,9 +216,10 @@ export async function syncDevicePushSubscription() {
       p_endpoint: endpoint,
       p_p256dh: p256dh,
       p_auth: auth,
+      p_platform: platform,
     });
   } catch {
-    // Ignore DB sync failure
+    // Ignore DB sync error
   }
 }
 
@@ -115,7 +252,7 @@ export async function requestNotificationPermissionAndRegister({
     if (sendWelcome) {
       await sendOsNotification({
         title: 'Notifications enabled',
-        body: "You'll get instant alerts for likes, comments, follows, and messages.",
+        body: "You'll get instant priority alerts for likes, comments, follows, and messages.",
         tag: 'handover-welcome',
         url: '/notifications',
       });
@@ -137,24 +274,25 @@ export async function sendOsNotification({
 
   const safeTitle = String(title || 'Handover');
   const safeBody = String(body || '');
-  const safeIcon = icon || '/icon-192.png';
+  const safeIcon =
+    icon && !(icon.startsWith('data:') && icon.length > 8192)
+      ? icon
+      : '/icon-192.png';
   const safeTag = tag || `handover-${Date.now()}`;
 
   try {
-    if ('serviceWorker' in navigator) {
-      const reg = await navigator.serviceWorker.getRegistration();
-      if (reg && typeof reg.showNotification === 'function') {
-        await reg.showNotification(safeTitle, {
-          body: safeBody,
-          icon: safeIcon,
-          badge: '/icon-192.png',
-          tag: safeTag,
-          renotify: true,
-          vibrate: [120, 60, 120],
-          data: { url },
-        });
-        return true;
-      }
+    const reg = await getActiveServiceWorkerRegistration();
+    if (reg && typeof reg.showNotification === 'function') {
+      await reg.showNotification(safeTitle, {
+        body: safeBody,
+        icon: safeIcon,
+        badge: '/icon-192.png',
+        tag: safeTag,
+        renotify: true,
+        vibrate: [120, 60, 120],
+        data: { url },
+      });
+      return true;
     }
   } catch {
     // Fall back to direct Notification constructor
@@ -178,6 +316,42 @@ export async function sendOsNotification({
     return true;
   } catch {
     return false;
+  }
+}
+
+export function sendPriorityPushToRecipient({
+  recipientId,
+  title,
+  body,
+  url = '/notifications',
+  tag,
+  icon = '',
+}) {
+  const sessionToken = readSessionToken();
+  if (!sessionToken || !recipientId || !isSupabaseConfigured || !supabase) {
+    return;
+  }
+
+  // Keep payload small (<4KB limit for Apple APNs & FCM): only send HTTP(S) URLs
+  const safeIcon =
+    typeof icon === 'string' && icon.startsWith('http') ? icon : '/icon-192.png';
+
+  try {
+    Promise.resolve(
+      supabase.functions.invoke('send-push', {
+        body: {
+          sessionToken,
+          recipientId,
+          title: String(title || 'Handover').slice(0, 80),
+          body: String(body || '').slice(0, 180),
+          url: String(url || '/notifications'),
+          tag: String(tag || `handover-${Date.now()}`),
+          icon: safeIcon,
+        },
+      })
+    ).catch(() => {});
+  } catch {
+    // Non-blocking background push
   }
 }
 
