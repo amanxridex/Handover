@@ -130,14 +130,20 @@ export function getStoredOnboardingState() {
 
 export function clearStoredOnboardingState() {
   const token = getStoredSessionToken();
-  if (token && isSupabaseConfigured && supabase) {
-    supabase.rpc('logout_session', { p_session_token: token }).catch(() => {});
-  }
   try {
     window.localStorage.removeItem(STORAGE_KEY);
     window.localStorage.removeItem(SESSION_TOKEN_KEY);
   } catch {
     // Ignore storage errors
+  }
+  if (token && isSupabaseConfigured && supabase) {
+    try {
+      Promise.resolve(
+        supabase.rpc('logout_session', { p_session_token: token })
+      ).catch(() => {});
+    } catch {
+      // Ignore network / RPC cleanup errors during logout
+    }
   }
 }
 
