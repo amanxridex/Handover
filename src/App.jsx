@@ -25,6 +25,7 @@ import {
 } from './data/brandsData';
 import ChatScreen from './components/ChatScreen';
 import BottomNav from './components/BottomNav';
+import BrandDealDetailScreen from './components/BrandDealDetailScreen';
 import BrandDealsScreen from './components/BrandDealsScreen';
 import HomeFeedScreen from './components/HomeFeedScreen';
 import NotificationsScreen from './components/NotificationsScreen';
@@ -153,6 +154,9 @@ function routeForSnapshot(snap) {
     return snap.activeChatId ? `/chat/${snap.activeChatId}` : '/chat';
   }
   if (snap.activeTab === 'search') {
+    if (snap.brandDealsOpen && snap.selectedDealId) {
+      return `/deals/${snap.selectedDealId}`;
+    }
     return snap.brandDealsOpen ? '/deals' : '/search';
   }
   if (snap.activeTab === 'profile') {
@@ -168,6 +172,7 @@ function snapshotFromPathname(pathname, alreadyOnboarded) {
     roleSubStep: 'role',
     activeTab: 'home',
     brandDealsOpen: false,
+    selectedDealId: null,
     hasPostModal: false,
     activeChatId: null,
     activeCommentsPostId: null,
@@ -208,6 +213,16 @@ function snapshotFromPathname(pathname, alreadyOnboarded) {
   }
   if (path === '/deals') {
     return { ...base, flowStep: 'main', activeTab: 'search', brandDealsOpen: true };
+  }
+  if (path.startsWith('/deals/')) {
+    const dealId = path.slice('/deals/'.length) || null;
+    return {
+      ...base,
+      flowStep: 'main',
+      activeTab: 'search',
+      brandDealsOpen: true,
+      selectedDealId: dealId,
+    };
   }
   if (path === '/search') return { ...base, flowStep: 'main', activeTab: 'search' };
   if (path === '/settings') {
@@ -264,6 +279,10 @@ export default function App() {
   const [brandDealsOpen, setBrandDealsOpen] = useState(
     Boolean(initialRouteSnap.brandDealsOpen)
   );
+  const [selectedDealId, setSelectedDealId] = useState(
+    initialRouteSnap.selectedDealId || null
+  );
+  const [selectedDealObj, setSelectedDealObj] = useState(null);
   const [selectedPost, setSelectedPost] = useState(null);
   const [activeChatId, setActiveChatId] = useState(initialRouteSnap.activeChatId);
   const [activeCommentsPostId, setActiveCommentsPostId] = useState(
@@ -292,6 +311,7 @@ export default function App() {
       roleSubStep,
       activeTab,
       brandDealsOpen,
+      selectedDealId,
       hasPostModal: Boolean(selectedPost),
       activeChatId,
       activeCommentsPostId,
@@ -303,6 +323,7 @@ export default function App() {
       roleSubStep,
       activeTab,
       brandDealsOpen,
+      selectedDealId,
       selectedPost,
       activeChatId,
       activeCommentsPostId,
@@ -410,6 +431,7 @@ export default function App() {
         setRoleSubStep(target.roleSubStep || 'role');
         setActiveTab(target.activeTab || 'home');
         setBrandDealsOpen(Boolean(target.brandDealsOpen));
+        setSelectedDealId(target.selectedDealId || null);
         if (!target.hasPostModal) {
           setSelectedPost(null);
         }
@@ -435,6 +457,7 @@ export default function App() {
         roleSubStep,
         activeTab,
         brandDealsOpen,
+        selectedDealId,
         hasPostModal: Boolean(selectedPost),
         activeChatId,
         activeCommentsPostId,
@@ -455,6 +478,7 @@ export default function App() {
     roleSubStep,
     activeTab,
     brandDealsOpen,
+    selectedDealId,
     selectedPost,
     activeChatId,
     activeCommentsPostId,
@@ -492,7 +516,11 @@ export default function App() {
         setNotificationsOpen(false);
       } else if (activeTab === 'search' && brandDealsOpen) {
         setTransitionMode('pop');
-        setBrandDealsOpen(false);
+        if (selectedDealId) {
+          setSelectedDealId(null);
+        } else {
+          setBrandDealsOpen(false);
+        }
       } else if (activeTab === 'profile' && settingsOpen) {
         setTransitionMode('pop');
         setSettingsOpen(false);
@@ -504,6 +532,7 @@ export default function App() {
     setTransitionMode(nextIdx > prevIdx ? 'tab-right' : 'tab-left');
     if (tabId !== 'search') {
       setBrandDealsOpen(false);
+      setSelectedDealId(null);
     }
     setActiveTab(tabId);
   };
@@ -545,6 +574,7 @@ export default function App() {
       roleSubStep: 'role',
       activeTab: 'home',
       brandDealsOpen: false,
+      selectedDealId: null,
       hasPostModal: false,
       activeChatId: null,
       activeCommentsPostId: null,
@@ -558,6 +588,7 @@ export default function App() {
 
     setActiveTab('home');
     setBrandDealsOpen(false);
+    setSelectedDealId(null);
     setNotificationsOpen(false);
     setActiveChatId(null);
     setActiveCommentsPostId(null);
@@ -617,6 +648,8 @@ export default function App() {
     setRoleSubStep('role');
     setActiveTab('home');
     setBrandDealsOpen(false);
+    setSelectedDealId(null);
+    setSelectedDealObj(null);
     setNotificationsOpen(false);
     setActiveChatId(null);
     setActiveCommentsPostId(null);
@@ -626,6 +659,7 @@ export default function App() {
       roleSubStep: 'role',
       activeTab: 'home',
       brandDealsOpen: false,
+      selectedDealId: null,
       hasPostModal: false,
       activeChatId: null,
       activeCommentsPostId: null,
@@ -690,9 +724,11 @@ export default function App() {
         ? 'settings'
         : activeTab === 'home' && notificationsOpen
           ? 'notifications'
-          : activeTab === 'search' && brandDealsOpen
-            ? 'brand-deals'
-            : `tab-${activeTab}`;
+          : activeTab === 'search' && brandDealsOpen && selectedDealId
+            ? `brand-deal-${selectedDealId}`
+            : activeTab === 'search' && brandDealsOpen
+              ? 'brand-deals'
+              : `tab-${activeTab}`;
 
   return (
     <div className="viewport-stage">
@@ -865,9 +901,22 @@ export default function App() {
             onOpenThread={(id) => setActiveChatId(id)}
             onCloseThread={goBackInHistory}
           />
+        ) : activeTab === 'search' && brandDealsOpen && selectedDealId ? (
+          <BrandDealDetailScreen
+            dealId={selectedDealId}
+            initialDeal={
+              selectedDealObj?.id === selectedDealId ? selectedDealObj : null
+            }
+            onBack={goBackInHistory}
+          />
         ) : activeTab === 'search' && brandDealsOpen ? (
           <BrandDealsScreen
             onBack={goBackInHistory}
+            onSelectDeal={(deal) => {
+              setTransitionMode('push');
+              setSelectedDealObj(deal);
+              setSelectedDealId(deal.id);
+            }}
             tabs={TABS}
             activeTab={activeTab}
             onSelectTab={handleTabSelect}
