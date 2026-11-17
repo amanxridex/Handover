@@ -99,6 +99,7 @@ export default function HomeFeedScreen({
   unreadNotifications,
   onOpenNotifications,
   onOpenFounders,
+  onOpenCreators,
   onOpenProfile,
   activeCommentsPostId,
   onOpenComments,
@@ -536,7 +537,7 @@ export default function HomeFeedScreen({
 
             {feedMenuOpen && (
               <div className="feed-mode-menu" role="menu">
-                {['Feed', 'Founders'].map((mode) => (
+                {['Feed', 'Founders', 'Creators'].map((mode) => (
                   <button
                     key={mode}
                     type="button"
@@ -549,6 +550,10 @@ export default function HomeFeedScreen({
                       setFeedMenuOpen(false);
                       if (mode === 'Founders') {
                         onOpenFounders?.();
+                        return;
+                      }
+                      if (mode === 'Creators') {
+                        onOpenCreators?.();
                         return;
                       }
                       setFeedMode(mode);
