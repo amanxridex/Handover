@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
-import { createBrandDeal } from '../services/dealsService';
+import { createBrandDeal, updateBrandDeal } from '../services/dealsService';
 import {
   triggerLightHaptic,
   triggerSuccessHaptic,
 } from '../utils/nativeBridge';
 
 const DEAL_CATEGORIES = ['Restaurants', 'Sports', 'Clothing', 'Tech'];
+
+function padThree(arr) {
+  const list = Array.isArray(arr) ? arr.map((s) => String(s || '')) : [];
+  return [list[0] || '', list[1] || '', list[2] || ''];
+}
 
 function BackArrowIcon() {
   return (
@@ -23,18 +28,34 @@ function BackArrowIcon() {
 
 export default function CreateBrandDealScreen({
   currentUser,
+  editingDeal = null,
   onBack,
   onPublished,
 }) {
+  const isEditing = Boolean(editingDeal?.id);
   const [brandName, setBrandName] = useState(
-    currentUser?.companyName?.trim() || ''
+    editingDeal?.brandName || currentUser?.companyName?.trim() || ''
   );
-  const [category, setCategory] = useState('Tech');
-  const [objectives, setObjectives] = useState(['', '', '']);
-  const [brief, setBrief] = useState('');
-  const [minRequirements, setMinRequirements] = useState(['', '', '']);
-  const [currency, setCurrency] = useState('USD'); // USD | INR
-  const [paymentInput, setPaymentInput] = useState('');
+  const [category, setCategory] = useState(editingDeal?.category || 'Tech');
+  const [objectives, setObjectives] = useState(() =>
+    padThree(editingDeal?.deliverables)
+  );
+  const [brief, setBrief] = useState(editingDeal?.brief || '');
+  const [minRequirements, setMinRequirements] = useState(() =>
+    padThree(editingDeal?.minRequirements)
+  );
+  const [currency, setCurrency] = useState(
+    editingDeal?.currency === 'INR' ? 'INR' : 'USD'
+  ); // USD | INR
+  const [paymentInput, setPaymentInput] = useState(() => {
+    if (editingDeal?.paymentCents > 0) {
+      return String(Math.round(editingDeal.paymentCents / 100));
+    }
+    if (editingDeal?.paymentAmount) {
+      return String(editingDeal.paymentAmount).replace(/[^0-9.]/g, '');
+    }
+    return '';
+  });
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -87,7 +108,7 @@ export default function CreateBrandDealScreen({
     setSubmitting(true);
     setErrorMsg('');
 
-    const res = await createBrandDeal({
+    const payload = {
       brandName: cleanBrand,
       category,
       objectives: cleanObjectives,
@@ -95,13 +116,23 @@ export default function CreateBrandDealScreen({
       brief: cleanBrief,
       paymentAmount: numericAmount,
       currency,
-      brandLogoUrl: currentUser?.companyLogoUrl || null,
-    });
+      brandLogoUrl:
+        editingDeal?.brandLogoUrl || currentUser?.companyLogoUrl || null,
+    };
+
+    const res = isEditing
+      ? await updateBrandDeal({ dealId: editingDeal.id, ...payload })
+      : await createBrandDeal(payload);
 
     setSubmitting(false);
 
     if (!res.ok) {
-      setErrorMsg(res.error || 'Could not publish deal. Please try again.');
+      setErrorMsg(
+        res.error ||
+          (isEditing
+            ? 'Could not update deal. Please try again.'
+            : 'Could not publish deal. Please try again.')
+      );
       return;
     }
 
@@ -133,7 +164,9 @@ export default function CreateBrandDealScreen({
           >
             <BackArrowIcon />
           </button>
-          <h1 className="composer-page-title">Deal for Creators</h1>
+          <h1 className="composer-page-title">
+            {isEditing ? 'Edit Brand Deal' : 'Deal for Creators'}
+          </h1>
           <span className="composer-header-spacer" aria-hidden="true" />
         </header>
 
@@ -295,10 +328,14 @@ export default function CreateBrandDealScreen({
             disabled={submitting}
           >
             {submitting
-              ? 'Publishing deal...'
+              ? isEditing
+                ? 'Saving changes...'
+                : 'Publishing deal...'
               : formattedPreview
-                ? `Publish Brand Deal · ${formattedPreview}`
-                : 'Publish Brand Deal'}
+                ? `${isEditing ? 'Save Brand Deal' : 'Publish Brand Deal'} · ${formattedPreview}`
+                : isEditing
+                  ? 'Save Brand Deal'
+                  : 'Publish Brand Deal'}
           </button>
         </div>
       </form>

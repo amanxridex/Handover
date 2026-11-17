@@ -16,6 +16,7 @@ import { BackTriangleIcon } from './Icons';
 export default function BrandDealDetailScreen({
   dealId,
   initialDeal,
+  currentUserId = '',
   onBack,
 }) {
   const [deal, setDeal] = useState(initialDeal || null);
@@ -218,35 +219,47 @@ export default function BrandDealDetailScreen({
         </section>
 
         <div className="deal-detail-cta-stage">
-          <button
-            type="button"
-            className={`deal-detail-cta ${application ? 'is-applied' : ''}`}
-            onClick={handleClaimDeal}
-            disabled={submitting || Boolean(application)}
-          >
-            {submitting
-              ? 'Submitting application...'
-              : application
-                ? `Applied · ${deal.paymentAmount}`
-                : `Accept Deal · ${deal.paymentAmount}`}
-          </button>
+          {deal.creatorProfileId && deal.creatorProfileId === currentUserId ? (
+            <div className="deal-detail-owner-badge">
+              You posted this campaign · {deal.isActive === false ? 'Closed' : 'Open for creators'}
+            </div>
+          ) : deal.isActive === false ? (
+            <div className="deal-detail-owner-badge">
+              This brand deal is currently closed.
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={`deal-detail-cta ${application ? 'is-applied' : ''}`}
+                onClick={handleClaimDeal}
+                disabled={submitting || Boolean(application)}
+              >
+                {submitting
+                  ? 'Submitting interest...'
+                  : application
+                    ? `Interest Submitted · ${deal.paymentAmount}`
+                    : `Submit Interest · ${deal.paymentAmount}`}
+              </button>
 
-          <p className="deal-detail-payout-note">{deal.payoutTerms}</p>
+              <p className="deal-detail-payout-note">{deal.payoutTerms}</p>
 
-          {feedbackMsg && (
-            <p className="deal-detail-feedback" role="status">
-              {feedbackMsg}
-            </p>
-          )}
+              {feedbackMsg && (
+                <p className="deal-detail-feedback" role="status">
+                  {feedbackMsg}
+                </p>
+              )}
 
-          {application && !submitting && (
-            <button
-              type="button"
-              className="deal-detail-withdraw-btn"
-              onClick={handleWithdraw}
-            >
-              Withdraw application
-            </button>
+              {application && !submitting && (
+                <button
+                  type="button"
+                  className="deal-detail-withdraw-btn"
+                  onClick={handleWithdraw}
+                >
+                  Withdraw request
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

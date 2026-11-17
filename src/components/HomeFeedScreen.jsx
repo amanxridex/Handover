@@ -684,23 +684,25 @@ export default function HomeFeedScreen({
                 </p>
               </button>
 
-              <button
-                type="button"
-                className="create-chooser-card is-deal"
-                onClick={() => {
-                  triggerLightHaptic();
-                  setCreateChooserOpen(false);
-                  onOpenCreateDeal?.();
-                }}
-              >
-                <span className="create-chooser-tag">Campaign</span>
-                <div className="create-chooser-title">
-                  Brand deal for creators
-                </div>
-                <p className="create-chooser-desc">
-                  Set 3 objectives, brief, 3 minimum requirements &amp; payment amount.
-                </p>
-              </button>
+              {currentUser?.role === 'founder' && (
+                <button
+                  type="button"
+                  className="create-chooser-card is-deal"
+                  onClick={() => {
+                    triggerLightHaptic();
+                    setCreateChooserOpen(false);
+                    onOpenCreateDeal?.();
+                  }}
+                >
+                  <span className="create-chooser-tag">Campaign</span>
+                  <div className="create-chooser-title">
+                    Brand deal for creators
+                  </div>
+                  <p className="create-chooser-desc">
+                    Set 3 objectives, brief, 3 minimum requirements &amp; payment amount.
+                  </p>
+                </button>
+              )}
             </div>
           </div>
         </div>

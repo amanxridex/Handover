@@ -269,6 +269,7 @@ export default function App() {
     initialRouteSnap.selectedDealId || null
   );
   const [selectedDealObj, setSelectedDealObj] = useState(null);
+  const [editingDealObj, setEditingDealObj] = useState(null);
   const [selectedPost, setSelectedPost] = useState(null);
   const [activeChatId, setActiveChatId] = useState(initialRouteSnap.activeChatId);
   const [activeCommentsPostId, setActiveCommentsPostId] = useState(
@@ -1118,6 +1119,27 @@ export default function App() {
             onBack={goBackInHistory}
             onLogout={handleLogout}
           />
+        ) : activeTab === 'profile' && editingDealObj && roleDetails?.role === 'founder' ? (
+          <CreateBrandDealScreen
+            currentUser={{
+              id: profileId,
+              name: selectedUser.name,
+              username: setupData.username,
+              avatar: setupData.avatar,
+              role: roleDetails?.role || '',
+              companyName: roleDetails?.companyName || '',
+              companyLogoUrl: roleDetails?.companyLogoUrl || '',
+            }}
+            editingDeal={editingDealObj}
+            onBack={() => {
+              setTransitionMode('pop');
+              setEditingDealObj(null);
+            }}
+            onPublished={() => {
+              setTransitionMode('pop');
+              setEditingDealObj(null);
+            }}
+          />
         ) : activeTab === 'profile' ? (
           <ProfileScreen
             currentUser={{
@@ -1136,6 +1158,39 @@ export default function App() {
             onOpenSettings={() => {
               setTransitionMode('push');
               setSettingsOpen(true);
+            }}
+            onOpenCreateDeal={() => {
+              if (roleDetails?.role !== 'founder') return;
+              setTransitionMode('push');
+              setCreatePage('deal');
+              setActiveTab('home');
+            }}
+            onEditDeal={(deal) => {
+              if (roleDetails?.role !== 'founder' || !deal?.id) return;
+              setTransitionMode('push');
+              setEditingDealObj(deal);
+            }}
+            onOpenDeal={(deal) => {
+              if (!deal?.id) return;
+              setTransitionMode('push');
+              setSelectedDealObj(deal);
+              setSelectedDealId(deal.id);
+              setBrandDealsOpen(true);
+              setActiveTab('search');
+            }}
+            onOpenUserProfile={(username) => {
+              if (!username) return;
+              setTransitionMode('push');
+              setViewedUserObj(null);
+              setViewedUsername(username);
+              setActiveTab('search');
+            }}
+            onMessageUser={(peer) => {
+              if (!peer?.id) return;
+              setTransitionMode('push');
+              setActiveChatPeer(peer);
+              setActiveChatId(peer.id);
+              setActiveTab('chat');
             }}
             tabs={TABS}
             activeTab={activeTab}
@@ -1157,7 +1212,7 @@ export default function App() {
               goBackInHistory();
             }}
           />
-        ) : activeTab === 'home' && createPage === 'deal' ? (
+        ) : activeTab === 'home' && createPage === 'deal' && roleDetails?.role === 'founder' ? (
           <CreateBrandDealScreen
             currentUser={{
               id: profileId,
@@ -1316,6 +1371,7 @@ export default function App() {
               setCreatePage('post');
             }}
             onOpenCreateDeal={() => {
+              if (roleDetails?.role !== 'founder') return;
               setTransitionMode('push');
               setCreatePage('deal');
             }}
@@ -1369,6 +1425,16 @@ export default function App() {
               setTransitionMode('push');
               setActiveTab('chat');
             }}
+            onOpenDeal={(deal) => {
+              if (!deal?.id) return;
+              setViewedUsername(null);
+              setViewedUserObj(null);
+              setTransitionMode('push');
+              setSelectedDealObj(deal);
+              setSelectedDealId(deal.id);
+              setBrandDealsOpen(true);
+              setActiveTab('search');
+            }}
             tabs={TABS}
             activeTab={activeTab}
             onSelectTab={handleTabSelect}
@@ -1379,6 +1445,7 @@ export default function App() {
             initialDeal={
               selectedDealObj?.id === selectedDealId ? selectedDealObj : null
             }
+            currentUserId={profileId}
             onBack={goBackInHistory}
           />
         ) : activeTab === 'search' && brandDealsOpen ? (

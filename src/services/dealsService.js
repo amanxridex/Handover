@@ -46,6 +46,7 @@ function mapDbDealRow(row) {
     : [];
   return {
     id: row.id,
+    creatorProfileId: row.creator_profile_id || null,
     brandName: row.brand_name,
     category: row.category,
     logoKey: row.logo_key,
@@ -67,6 +68,8 @@ function mapDbDealRow(row) {
     payoutTerms:
       row.payout_terms ||
       `Single payment of ${row.payment_amount} upon campaign completion`,
+    isActive: row.is_active !== false,
+    applicantCount: Number(row.applicant_count || 0),
     sortOrder: row.sort_order ?? 0,
   };
 }
@@ -118,7 +121,7 @@ export async function fetchBrandDeals() {
     const { data, error } = await supabase
       .from('brand_deals')
       .select(
-        'id, brand_name, category, logo_key, brand_logo_url, payment_amount, payment_cents, currency, headline, subtitle, deliverables, min_requirements, brief, payout_terms, sort_order'
+        'id, creator_profile_id, brand_name, category, logo_key, brand_logo_url, payment_amount, payment_cents, currency, headline, subtitle, deliverables, min_requirements, brief, payout_terms, is_active, sort_order'
       )
       .eq('is_active', true)
       .order('created_at', { ascending: false })
@@ -145,10 +148,9 @@ export async function fetchBrandDealById(dealId) {
     const { data, error } = await supabase
       .from('brand_deals')
       .select(
-        'id, brand_name, category, logo_key, brand_logo_url, payment_amount, payment_cents, currency, headline, subtitle, deliverables, min_requirements, brief, payout_terms, sort_order'
+        'id, creator_profile_id, brand_name, category, logo_key, brand_logo_url, payment_amount, payment_cents, currency, headline, subtitle, deliverables, min_requirements, brief, payout_terms, is_active, sort_order'
       )
       .eq('id', dealId)
-      .eq('is_active', true)
       .maybeSingle();
 
     if (error || !data) {
@@ -261,7 +263,7 @@ export async function withdrawBrandDealApplication(dealId) {
   }
 }
 
-export async function createBrandDeal({
+function prepareDealPayload({
   brandName,
   category,
   headline,
@@ -276,7 +278,7 @@ export async function createBrandDeal({
   const cleanBrand = String(brandName || '').trim();
   const numericAmount = Number(String(paymentAmount || '').replace(/[^0-9.]/g, ''));
   if (!cleanBrand || !numericAmount || numericAmount <= 0) {
-    return { ok: false, error: 'Enter a brand name and valid payment amount.' };
+    return { error: 'Enter a brand name and valid payment amount.' };
   }
 
   const cleanCurrency = currency === 'INR' ? 'INR' : 'USD';
@@ -284,10 +286,28 @@ export async function createBrandDeal({
   const locale = cleanCurrency === 'INR' ? 'en-IN' : 'en-US';
   const formattedAmount = `${symbol}${Math.round(numericAmount).toLocaleString(locale)}`;
   const paymentCents = Math.round(numericAmount * 100);
-  const cleanObjectives = (objectives || []).map((s) => String(s || '').trim()).filter(Boolean);
-  const cleanReqs = (minRequirements || []).map((s) => String(s || '').trim()).filter(Boolean);
-  const cleanBrief = String(brief || '').trim();
   const cleanCat = String(category || 'Tech').trim();
+
+  return {
+    cleanBrand,
+    cleanCat,
+    formattedAmount,
+    paymentCents,
+    cleanCurrency,
+    cleanHeadline: headline?.trim() || `${cleanBrand} Creator Offer`,
+    cleanSubtitle: subtitle?.trim() || `${cleanCat} Campaign · Creator Collab`,
+    cleanObjectives: (objectives || []).map((s) => String(s || '').trim()).filter(Boolean),
+    cleanReqs: (minRequirements || []).map((s) => String(s || '').trim()).filter(Boolean),
+    cleanBrief: String(brief || '').trim(),
+    brandLogoUrl: brandLogoUrl || null,
+  };
+}
+
+export async function createBrandDeal(input) {
+  const prepared = prepareDealPayload(input);
+  if (prepared.error) {
+    return { ok: false, error: prepared.error };
+  }
 
   const sessionToken = getStoredSessionToken();
   if (!isSupabaseConfigured || !supabase || !sessionToken) {
@@ -297,17 +317,17 @@ export async function createBrandDeal({
   try {
     const { data, error } = await supabase.rpc('create_brand_deal', {
       p_session_token: sessionToken,
-      p_brand_name: cleanBrand,
-      p_category: cleanCat,
-      p_payment_amount: formattedAmount,
-      p_payment_cents: paymentCents,
-      p_headline: headline?.trim() || `${cleanBrand} Creator Offer`,
-      p_subtitle: subtitle?.trim() || `${cleanCat} Campaign · Creator Collab`,
-      p_deliverables: cleanObjectives,
-      p_min_requirements: cleanReqs,
-      p_brief: cleanBrief,
-      p_brand_logo_url: brandLogoUrl || null,
-      p_currency: cleanCurrency,
+      p_brand_name: prepared.cleanBrand,
+      p_category: prepared.cleanCat,
+      p_payment_amount: prepared.formattedAmount,
+      p_payment_cents: prepared.paymentCents,
+      p_headline: prepared.cleanHeadline,
+      p_subtitle: prepared.cleanSubtitle,
+      p_deliverables: prepared.cleanObjectives,
+      p_min_requirements: prepared.cleanReqs,
+      p_brief: prepared.cleanBrief,
+      p_brand_logo_url: prepared.brandLogoUrl,
+      p_currency: prepared.cleanCurrency,
     });
 
     if (error || !data?.ok) {
@@ -320,5 +340,114 @@ export async function createBrandDeal({
     return { ok: true, deal: data.deal };
   } catch (err) {
     return { ok: false, error: err?.message || 'Network error.' };
+  }
+}
+
+export async function updateBrandDeal({ dealId, ...input }) {
+  if (!dealId) return { ok: false, error: 'Invalid brand deal.' };
+  const prepared = prepareDealPayload(input);
+  if (prepared.error) {
+    return { ok: false, error: prepared.error };
+  }
+
+  const sessionToken = getStoredSessionToken();
+  if (!isSupabaseConfigured || !supabase || !sessionToken) {
+    return { ok: false, error: 'Sign in required to edit this brand deal.' };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('update_brand_deal', {
+      p_session_token: sessionToken,
+      p_deal_id: dealId,
+      p_brand_name: prepared.cleanBrand,
+      p_category: prepared.cleanCat,
+      p_payment_amount: prepared.formattedAmount,
+      p_payment_cents: prepared.paymentCents,
+      p_currency: prepared.cleanCurrency,
+      p_headline: prepared.cleanHeadline,
+      p_subtitle: prepared.cleanSubtitle,
+      p_deliverables: prepared.cleanObjectives,
+      p_min_requirements: prepared.cleanReqs,
+      p_brief: prepared.cleanBrief,
+      p_brand_logo_url: prepared.brandLogoUrl,
+    });
+
+    if (error || !data?.ok) {
+      return {
+        ok: false,
+        error: data?.error || error?.message || 'Could not update brand deal.',
+      };
+    }
+
+    return { ok: true, deal: data.deal };
+  } catch (err) {
+    return { ok: false, error: err?.message || 'Network error.' };
+  }
+}
+
+export async function fetchProfileBrandDeals(targetProfileId) {
+  if (!targetProfileId || !isSupabaseConfigured || !supabase) {
+    return [];
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('get_profile_brand_deals', {
+      p_target_profile_id: targetProfileId,
+      p_session_token: getStoredSessionToken() || null,
+    });
+
+    if (error || !Array.isArray(data)) {
+      return [];
+    }
+
+    return data;
+  } catch {
+    return [];
+  }
+}
+
+export async function setBrandDealStatus(dealId, isActive) {
+  const sessionToken = getStoredSessionToken();
+  if (!dealId || !sessionToken || !isSupabaseConfigured || !supabase) {
+    return { ok: false, error: 'Sign in required.' };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('set_brand_deal_status', {
+      p_session_token: sessionToken,
+      p_deal_id: dealId,
+      p_is_active: Boolean(isActive),
+    });
+
+    if (error || !data?.ok) {
+      return { ok: false, error: data?.error || error?.message || 'Update failed.' };
+    }
+    return { ok: true, isActive: Boolean(data.isActive) };
+  } catch (err) {
+    return { ok: false, error: err?.message || 'Network error.' };
+  }
+}
+
+export async function fetchBrandDealApplicants(dealId) {
+  const sessionToken = getStoredSessionToken();
+  if (!dealId || !sessionToken || !isSupabaseConfigured || !supabase) {
+    return { ok: false, applicants: [] };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('get_brand_deal_applicants', {
+      p_session_token: sessionToken,
+      p_deal_id: dealId,
+    });
+
+    if (error || !data?.ok) {
+      return { ok: false, applicants: [] };
+    }
+    return {
+      ok: true,
+      applicants: Array.isArray(data.applicants) ? data.applicants : [],
+    };
+  } catch {
+    return { ok: false, applicants: [] };
   }
 }

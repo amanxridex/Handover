@@ -1,5 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import avatarDefault from '../assets/avatar-default.jpg';
+import {
+  fetchBrandDealApplicants,
+  fetchProfileBrandDeals,
+  setBrandDealStatus,
+} from '../services/dealsService';
 import { fetchUserProfileOverview } from '../services/feedService';
 import {
   checkIsFollowingProfile,
@@ -11,6 +16,7 @@ import {
   triggerSuccessHaptic,
 } from '../utils/nativeBridge';
 import BottomNav from './BottomNav';
+import BrandLogoMark from './BrandLogoMark';
 import { BackTriangleIcon, CloseXIcon } from './Icons';
 
 function GearIcon() {
@@ -33,6 +39,10 @@ export default function ProfileScreen({
   viewedUsername = '',
   profileUser = null,
   onMessageUser,
+  onOpenUserProfile,
+  onOpenDeal,
+  onEditDeal,
+  onOpenCreateDeal,
   showBadges = true,
   onClose,
   selectedPost,
@@ -57,6 +67,13 @@ export default function ProfileScreen({
     followingCount: 0,
     postsCount: 0,
   });
+  const [contentTab, setContentTab] = useState('posts'); // posts | deals
+  const [profileDeals, setProfileDeals] = useState([]);
+  const [loadingDeals, setLoadingDeals] = useState(false);
+  const [togglingDealId, setTogglingDealId] = useState(null);
+  const [requestsDeal, setRequestsDeal] = useState(null);
+  const [requestsList, setRequestsList] = useState([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
 
   useEffect(() => {
     if (!isPublicView) {
@@ -170,9 +187,59 @@ export default function ProfileScreen({
     };
   }, [isPublicView, activeProfileId]);
 
+  const loadProfileDeals = useCallback(async () => {
+    if (!activeProfileId) {
+      setProfileDeals([]);
+      return;
+    }
+    setLoadingDeals(true);
+    const list = await fetchProfileBrandDeals(activeProfileId);
+    setProfileDeals(Array.isArray(list) ? list : []);
+    setLoadingDeals(false);
+  }, [activeProfileId]);
+
+  useEffect(() => {
+    loadProfileDeals();
+  }, [loadProfileDeals]);
+
+  useEffect(() => {
+    setContentTab('posts');
+    setRequestsDeal(null);
+    setRequestsList([]);
+  }, [activeProfileId, isPublicView]);
+
   const showToast = (msg) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(''), 1800);
+  };
+
+  const handleToggleDealStatus = async (deal) => {
+    if (!deal?.id || togglingDealId) return;
+    triggerLightHaptic();
+    const nextActive = !deal.isActive;
+    setTogglingDealId(deal.id);
+    const res = await setBrandDealStatus(deal.id, nextActive);
+    setTogglingDealId(null);
+    if (!res.ok) {
+      showToast(res.error || 'Could not update deal status');
+      return;
+    }
+    triggerSuccessHaptic();
+    setProfileDeals((prev) =>
+      prev.map((d) => (d.id === deal.id ? { ...d, isActive: res.isActive } : d))
+    );
+    showToast(res.isActive ? 'Brand deal opened' : 'Brand deal closed');
+  };
+
+  const handleOpenRequests = async (deal) => {
+    if (!deal?.id) return;
+    triggerLightHaptic();
+    setRequestsDeal(deal);
+    setRequestsList([]);
+    setLoadingRequests(true);
+    const res = await fetchBrandDealApplicants(deal.id);
+    setRequestsList(Array.isArray(res.applicants) ? res.applicants : []);
+    setLoadingRequests(false);
   };
 
   const handleToggleFollow = async () => {
@@ -422,7 +489,137 @@ export default function ProfileScreen({
               </p>
             </div>
 
-            {loadingOverview ? (
+            {(isFounder || profileDeals.length > 0) && (
+              <div className="profile-content-tabs" role="tablist" aria-label="Profile sections">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={contentTab === 'posts'}
+                  className={`profile-content-tab ${contentTab === 'posts' ? 'active' : ''}`}
+                  onClick={() => {
+                    triggerLightHaptic();
+                    setContentTab('posts');
+                  }}
+                >
+                  Feed Posts ({overview.posts.length})
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={contentTab === 'deals'}
+                  className={`profile-content-tab ${contentTab === 'deals' ? 'active' : ''}`}
+                  onClick={() => {
+                    triggerLightHaptic();
+                    setContentTab('deals');
+                  }}
+                >
+                  Brand Deals ({profileDeals.length})
+                </button>
+              </div>
+            )}
+
+            {contentTab === 'deals' && (isFounder || profileDeals.length > 0) ? (
+              loadingDeals ? (
+                <div className="profile-empty-state">
+                  <p className="profile-empty-sub">Loading brand deals...</p>
+                </div>
+              ) : profileDeals.length === 0 ? (
+                <div className="profile-empty-state">
+                  <div className="profile-empty-title">No brand deals yet</div>
+                  <p className="profile-empty-sub">
+                    {isPublicView
+                      ? `${displayName} has no active brand deals right now.`
+                      : 'Create a brand deal for creators with objectives, brief & payout.'}
+                  </p>
+                  {!isPublicView && isFounder && onOpenCreateDeal && (
+                    <button
+                      type="button"
+                      className="profile-empty-cta"
+                      onClick={() => {
+                        triggerLightHaptic();
+                        onOpenCreateDeal();
+                      }}
+                    >
+                      Create Brand Deal
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="profile-deals-stack">
+                  {profileDeals.map((deal) => (
+                    <div key={deal.id} className="profile-deal-card">
+                      <button
+                        type="button"
+                        className="profile-deal-main"
+                        onClick={() => {
+                          triggerLightHaptic();
+                          onOpenDeal?.(deal);
+                        }}
+                      >
+                        <div className="profile-deal-logo-box">
+                          <BrandLogoMark
+                            logoKey={deal.logoKey}
+                            logoUrl={deal.brandLogoUrl}
+                            name={deal.brandName}
+                          />
+                        </div>
+                        <div className="profile-deal-info">
+                          <div className="profile-deal-top-row">
+                            <span className="profile-deal-title">{deal.headline}</span>
+                            <span
+                              className={`profile-deal-status ${
+                                deal.isActive ? 'is-open' : 'is-closed'
+                              }`}
+                            >
+                              {deal.isActive ? 'Open' : 'Closed'}
+                            </span>
+                          </div>
+                          <div className="profile-deal-meta">
+                            {deal.brandName} · {deal.category} · {deal.paymentAmount}
+                          </div>
+                        </div>
+                      </button>
+
+                      {!isPublicView && (
+                        <div className="profile-deal-actions">
+                          <button
+                            type="button"
+                            className="profile-deal-btn is-requests"
+                            onClick={() => handleOpenRequests(deal)}
+                          >
+                            Requests ({deal.applicantCount ?? 0})
+                          </button>
+                          <button
+                            type="button"
+                            className="profile-deal-btn"
+                            onClick={() => {
+                              triggerLightHaptic();
+                              onEditDeal?.(deal);
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className={`profile-deal-btn ${
+                              deal.isActive ? 'is-close' : 'is-reopen'
+                            }`}
+                            onClick={() => handleToggleDealStatus(deal)}
+                            disabled={togglingDealId === deal.id}
+                          >
+                            {togglingDealId === deal.id
+                              ? '...'
+                              : deal.isActive
+                                ? 'Close Deal'
+                                : 'Open Deal'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : loadingOverview ? (
               <div className="profile-empty-state">
                 <p className="profile-empty-sub">Loading posts...</p>
               </div>
@@ -519,6 +716,123 @@ export default function ProfileScreen({
               >
                 Done
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {requestsDeal && (
+        <div
+          className="deal-applicants-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Creator requests for ${requestsDeal.headline}`}
+          onClick={() => setRequestsDeal(null)}
+        >
+          <div
+            className="deal-applicants-sheet"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="deal-applicants-header">
+              <div>
+                <h2 className="deal-applicants-title">Creator Requests</h2>
+                <p className="deal-applicants-sub">
+                  {requestsDeal.headline} · {requestsDeal.paymentAmount}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="feed-create-close"
+                onClick={() => setRequestsDeal(null)}
+                aria-label="Close requests"
+              >
+                <CloseXIcon />
+              </button>
+            </div>
+
+            <div className="deal-applicants-list">
+              {loadingRequests ? (
+                <div className="profile-empty-state">
+                  <p className="profile-empty-sub">Loading creator requests...</p>
+                </div>
+              ) : requestsList.length === 0 ? (
+                <div className="profile-empty-state">
+                  <span className="profile-empty-title">No requests yet</span>
+                  <p className="profile-empty-sub">
+                    When creators submit interest on this brand deal, they will
+                    appear here.
+                  </p>
+                </div>
+              ) : (
+                requestsList.map((creator) => (
+                  <div key={creator.applicationId} className="deal-applicant-row">
+                    <button
+                      type="button"
+                      className="deal-applicant-person"
+                      onClick={() => {
+                        triggerLightHaptic();
+                        setRequestsDeal(null);
+                        if (creator.username && onOpenUserProfile) {
+                          onOpenUserProfile(creator.username);
+                        }
+                      }}
+                    >
+                      <img
+                        src={creator.avatar || avatarDefault}
+                        alt={creator.fullName}
+                        className="deal-applicant-avatar"
+                      />
+                      <div className="deal-applicant-copy">
+                        <div className="deal-applicant-name">
+                          {creator.fullName}
+                        </div>
+                        <div className="deal-applicant-handle">
+                          @{creator.username}
+                          {Array.isArray(creator.contentTypes) &&
+                          creator.contentTypes.length > 0
+                            ? ` · ${creator.contentTypes.slice(0, 2).join(', ')}`
+                            : ''}
+                        </div>
+                      </div>
+                    </button>
+
+                    <div className="deal-applicant-actions">
+                      {creator.username && onOpenUserProfile && (
+                        <button
+                          type="button"
+                          className="deal-applicant-btn"
+                          onClick={() => {
+                            triggerLightHaptic();
+                            setRequestsDeal(null);
+                            onOpenUserProfile(creator.username);
+                          }}
+                        >
+                          Profile
+                        </button>
+                      )}
+                      {onMessageUser && (
+                        <button
+                          type="button"
+                          className="deal-applicant-btn is-primary"
+                          onClick={() => {
+                            triggerLightHaptic();
+                            setRequestsDeal(null);
+                            onMessageUser({
+                              id: creator.id,
+                              fullName: creator.fullName,
+                              name: creator.fullName,
+                              username: creator.username,
+                              avatar: creator.avatar || avatarDefault,
+                            });
+                          }}
+                        >
+                          Message
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
