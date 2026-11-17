@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 export default function BottomNav({
   tabs,
@@ -7,6 +7,16 @@ export default function BottomNav({
   dark = false,
   floating = false,
 }) {
+  const [rippleTab, setRippleTab] = useState(null);
+
+  const handleTap = (id) => {
+    setRippleTab(id);
+    setTimeout(() => {
+      setRippleTab((prev) => (prev === id ? null : prev));
+    }, 340);
+    onSelectTab(id);
+  };
+
   return (
     <div className={`bottom-nav-wrap ${floating ? 'feed-bottom-nav-wrap' : ''}`}>
       <nav
@@ -15,17 +25,21 @@ export default function BottomNav({
       >
         {tabs.map(({ id, label, Icon }) => {
           const isActive = activeTab === id;
+          const isRippling = rippleTab === id;
           return (
             <button
               key={id}
               type="button"
               className={`nav-item ${dark ? 'feed-nav-item' : ''} ${
                 isActive ? 'active' : ''
-              }`}
-              onClick={() => onSelectTab(id)}
+              } ${isRippling ? 'is-rippling' : ''}`}
+              onClick={() => handleTap(id)}
               aria-current={isActive ? 'page' : undefined}
             >
-              <Icon active={isActive} dark={dark} />
+              {isRippling && <span className="nav-tap-ripple" aria-hidden="true" />}
+              <span className="nav-icon-wrap">
+                <Icon active={isActive} dark={dark} />
+              </span>
               <span className="nav-label">{label}</span>
             </button>
           );

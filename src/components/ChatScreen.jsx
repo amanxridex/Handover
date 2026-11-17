@@ -235,7 +235,10 @@ export default function ChatScreen({
     const restName = nameParts.slice(1).join(' ');
 
     return (
-      <section className="chat-thread-screen" aria-label={`Chat with ${activeThread.name}`}>
+      <section
+        className="chat-thread-screen screen-stage-view is-push"
+        aria-label={`Chat with ${activeThread.name}`}
+      >
         {/* Orange Rounded Conversation Container */}
         <div className="chat-thread-surface">
           <div className="chat-thread-header-fade" aria-hidden="true" />

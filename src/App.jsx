@@ -129,6 +129,8 @@ const TABS = [
   { id: 'profile', label: 'Profile', Icon: ProfileTabIcon },
 ];
 
+const TAB_ORDER = { home: 0, chat: 1, search: 2, profile: 3 };
+
 function routeForSnapshot(snap) {
   if (!snap || snap.flowStep === 'onboarding') return '/auth';
   if (snap.flowStep === 'signin') return '/signin';
@@ -264,6 +266,7 @@ export default function App() {
   );
   const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
   const [exitHint, setExitHint] = useState(false);
+  const [transitionMode, setTransitionMode] = useState('none'); // none | push | pop | tab-right | tab-left
 
   const isPoppingRef = useRef(false);
   const historyReadyRef = useRef(false);
@@ -393,6 +396,7 @@ export default function App() {
 
       if (state?.handoverNav) {
         isPoppingRef.current = true;
+        setTransitionMode('pop');
         const target = state.handoverNav;
         setFlowStep(target.flowStep);
         setRoleSubStep(target.roleSubStep || 'role');
@@ -463,6 +467,7 @@ export default function App() {
   }, [searchQuery]);
 
   const goBackInHistory = useCallback(() => {
+    triggerLightHaptic();
     window.history.back();
   }, []);
 
@@ -473,6 +478,19 @@ export default function App() {
 
   const handleTabSelect = (tabId) => {
     triggerLightHaptic();
+    if (tabId === activeTab) {
+      if (activeTab === 'home' && notificationsOpen) {
+        setTransitionMode('pop');
+        setNotificationsOpen(false);
+      } else if (activeTab === 'profile' && settingsOpen) {
+        setTransitionMode('pop');
+        setSettingsOpen(false);
+      }
+      return;
+    }
+    const nextIdx = TAB_ORDER[tabId] ?? 0;
+    const prevIdx = TAB_ORDER[activeTab] ?? 0;
+    setTransitionMode(nextIdx > prevIdx ? 'tab-right' : 'tab-left');
     setActiveTab(tabId);
   };
 
@@ -529,6 +547,7 @@ export default function App() {
     setActiveChatId(null);
     setActiveCommentsPostId(null);
     setSettingsOpen(false);
+    setTransitionMode('push');
     setFlowStep('main');
   };
 
@@ -602,6 +621,7 @@ export default function App() {
     window.history.replaceState({ handoverSentinel: true }, '', '/auth');
     window.history.pushState({ handoverNav: resetRoot }, '', '/auth');
     setProfileId(null);
+    setTransitionMode('pop');
     setFlowStep('onboarding');
   };
 
@@ -632,6 +652,7 @@ export default function App() {
       setSetupError(
         `@${setupData.username} was already claimed — please choose a different username.`
       );
+      setTransitionMode('pop');
       setFlowStep('setup');
       return;
     }
@@ -643,6 +664,17 @@ export default function App() {
     setSetupData((prev) => ({ ...prev, password: '' }));
     enterHomeFeedRoot();
   };
+
+  const screenViewKey =
+    flowStep !== 'main'
+      ? flowStep === 'role'
+        ? `role-${roleSubStep}`
+        : flowStep
+      : activeTab === 'profile' && settingsOpen
+        ? 'settings'
+        : activeTab === 'home' && notificationsOpen
+          ? 'notifications'
+          : `tab-${activeTab}`;
 
   return (
     <div className="viewport-stage">
@@ -658,20 +690,33 @@ export default function App() {
                 : flowStep === 'role'
                   ? 'Founder or Creator selection'
                   : activeTab === 'profile'
-                    ? 'Olivia Beits profile screen'
+                    ? `${selectedUser.name} profile screen`
                     : 'Brands discovery screen'
         }
       >
+        <div
+          key={screenViewKey}
+          className={`screen-stage-view ${
+            transitionMode !== 'none' ? `is-${transitionMode}` : ''
+          }`}
+        >
         {flowStep === 'onboarding' ? (
           <OnboardingScreen
-            onSignUp={() => setFlowStep('setup')}
-            onSignIn={() => setFlowStep('signin')}
+            onSignUp={() => {
+              setTransitionMode('push');
+              setFlowStep('setup');
+            }}
+            onSignIn={() => {
+              setTransitionMode('push');
+              setFlowStep('signin');
+            }}
           />
         ) : flowStep === 'signin' ? (
           <SignInScreen
             onBack={goBackInHistory}
             onSuccess={handleSignInSuccess}
             onSwitchToSignUp={() => {
+              setTransitionMode('push');
               setSetupError('');
               setFlowStep('setup');
             }}
@@ -681,14 +726,23 @@ export default function App() {
             initialData={setupData}
             initialError={setupError}
             onBack={goBackInHistory}
-            onComplete={handleSetupComplete}
-            onSwitchToSignIn={() => setFlowStep('signin')}
+            onComplete={(data) => {
+              setTransitionMode('push');
+              handleSetupComplete(data);
+            }}
+            onSwitchToSignIn={() => {
+              setTransitionMode('push');
+              setFlowStep('signin');
+            }}
           />
         ) : flowStep === 'role' ? (
           <RoleOnboardingFlow
             userName={selectedUser.name}
             subStep={roleSubStep}
-            onSubStepChange={setRoleSubStep}
+            onSubStepChange={(nextSub) => {
+              setTransitionMode('push');
+              setRoleSubStep(nextSub);
+            }}
             initialData={roleDetails}
             onSaveDraft={setRoleDetails}
             onBackToSetup={goBackInHistory}
@@ -726,7 +780,10 @@ export default function App() {
             selectedPost={selectedPost}
             onSelectPost={setSelectedPost}
             onClosePost={goBackInHistory}
-            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenSettings={() => {
+              setTransitionMode('push');
+              setSettingsOpen(true);
+            }}
             tabs={TABS}
             activeTab={activeTab}
             onSelectTab={handleTabSelect}
@@ -769,7 +826,10 @@ export default function App() {
               companyLogoUrl: roleDetails?.companyLogoUrl || '',
             }}
             unreadNotifications={unreadNotifications}
-            onOpenNotifications={() => setNotificationsOpen(true)}
+            onOpenNotifications={() => {
+              setTransitionMode('push');
+              setNotificationsOpen(true);
+            }}
             onOpenProfile={() => handleTabSelect('profile')}
             activeCommentsPostId={activeCommentsPostId}
             onOpenComments={(postId) => setActiveCommentsPostId(String(postId))}
@@ -937,6 +997,7 @@ export default function App() {
             )}
           </>
         )}
+        </div>
 
         {exitHint && (
           <div className="app-exit-toast" role="status">

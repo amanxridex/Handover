@@ -6,6 +6,11 @@ import { initNativeShell } from './utils/nativeBridge';
 
 initNativeShell();
 
+// Enable instant CSS :active feedback on iOS Safari & Android touch screens
+if (typeof document !== 'undefined') {
+  document.addEventListener('touchstart', () => {}, { passive: true });
+}
+
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     let refreshing = false;

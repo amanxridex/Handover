@@ -5638,3 +5638,182 @@ body,
 [data-theme='light'] .chat-row-time {
   color: #64748b;
 }
+
+
+/* ================================
+   Screen Transitions & Tap Physics
+================================ */
+@keyframes screenPushIn {
+  from {
+    opacity: 0.72;
+    transform: translate3d(26px, 0, 0) scale(0.988);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes screenPopIn {
+  from {
+    opacity: 0.78;
+    transform: translate3d(-22px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes screenTabRightIn {
+  from {
+    opacity: 0.78;
+    transform: translate3d(18px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes screenTabLeftIn {
+  from {
+    opacity: 0.78;
+    transform: translate3d(-18px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes navTapRipple {
+  0% {
+    transform: translate(-50%, -50%) scale(0.35);
+    opacity: 0.55;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.65);
+    opacity: 0;
+  }
+}
+
+@keyframes navIconPop {
+  0% {
+    transform: scale(0.84);
+  }
+  55% {
+    transform: scale(1.16);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.screen-stage-view {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  will-change: transform, opacity;
+}
+
+.screen-stage-view.is-push {
+  animation: screenPushIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.screen-stage-view.is-pop {
+  animation: screenPopIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.screen-stage-view.is-tab-right {
+  animation: screenTabRightIn 0.21s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.screen-stage-view.is-tab-left {
+  animation: screenTabLeftIn 0.21s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Tactile Tab Bar Tap Ripple & Active Pill Highlight */
+.nav-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.nav-item:active {
+  transform: scale(0.88);
+}
+
+.nav-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 12px;
+  border-radius: 9999px;
+  transition: background-color 0.18s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.nav-item.active .nav-icon-wrap {
+  background: rgba(225, 29, 72, 0.1);
+}
+
+.feed-nav-item.active .nav-icon-wrap {
+  background: rgba(26, 102, 255, 0.28);
+}
+
+.nav-item.active .nav-icon-wrap svg {
+  animation: navIconPop 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.nav-tap-ripple {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  border-radius: 9999px;
+  background: rgba(59, 130, 246, 0.36);
+  pointer-events: none;
+  animation: navTapRipple 0.34s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Crisp Tactile Press Feedback Across Buttons & Lists */
+button,
+.settings-row,
+.chat-row,
+.notif-item,
+.role-card,
+.promo-banner,
+.brand-chip,
+.feed-story-capsule {
+  transition: transform 0.12s cubic-bezier(0.2, 0.8, 0.2, 1),
+    background-color 0.15s ease, opacity 0.12s ease;
+}
+
+.chat-row:active,
+.notif-item:active,
+.role-card:active,
+.promo-banner:active,
+.onboarding-next-btn:active {
+  transform: scale(0.975);
+}
+
+.settings-row:active {
+  transform: scale(0.988);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-stage-view.is-push,
+  .screen-stage-view.is-pop,
+  .screen-stage-view.is-tab-right,
+  .screen-stage-view.is-tab-left,
+  .nav-tap-ripple,
+  .nav-item.active .nav-icon-wrap svg {
+    animation: none;
+  }
+}
