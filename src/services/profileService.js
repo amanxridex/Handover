@@ -465,7 +465,7 @@ export async function toggleFollowProfile(targetProfileId) {
     }
     if (Boolean(data.following)) {
       const me = getStoredOnboardingState();
-      const actorId = me?.profileId || '';
+      const actorId = me?.id || me?.profileId || '';
       const actorName =
         me?.setupData?.name || me?.setupData?.username || 'Someone';
       const actorAvatar = me?.setupData?.avatar || '';
@@ -479,6 +479,7 @@ export async function toggleFollowProfile(targetProfileId) {
 
       sendPriorityPushToRecipient({
         recipientId: targetProfileId,
+        kind: 'follow',
         title: actorName,
         body: 'started following you',
         url: '/notifications',

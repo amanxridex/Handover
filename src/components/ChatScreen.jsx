@@ -217,10 +217,26 @@ export default function ChatScreen({
     );
   }, [chats, query]);
 
-  const activeThread = useMemo(
-    () => chats.find((c) => c.id === activeThreadId) || null,
-    [chats, activeThreadId]
-  );
+  const activeThread = useMemo(() => {
+    const found = chats.find((c) => c.id === activeThreadId);
+    if (found) return found;
+    if (activeThreadId && isUuid(activeThreadId)) {
+      const peerName =
+        activePeer?.fullName || activePeer?.name || 'Loading conversation';
+      return {
+        id: activeThreadId,
+        shortName: peerName.split(' ')[0] || peerName,
+        name: peerName,
+        username: activePeer?.username || '',
+        avatar: activePeer?.avatar || avatarDefault,
+        time: '',
+        preview: '',
+        isDbThread: true,
+        messages: [],
+      };
+    }
+    return null;
+  }, [chats, activeThreadId, activePeer]);
 
   useEffect(() => {
     if (activeThread) {

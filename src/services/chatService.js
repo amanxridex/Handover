@@ -132,7 +132,7 @@ export async function sendDirectMessage(recipientId, text) {
     }
 
     const actor = getStoredOnboardingState();
-    const senderId = actor?.profileId || '';
+    const senderId = actor?.id || actor?.profileId || '';
     const senderName =
       actor?.setupData?.name || actor?.setupData?.username || 'New Message';
     const senderAvatar = actor?.setupData?.avatar || '';
@@ -148,6 +148,7 @@ export async function sendDirectMessage(recipientId, text) {
 
     sendPriorityPushToRecipient({
       recipientId,
+      kind: 'dm',
       title: senderName,
       body: data.message.text,
       url: senderId ? `/chat/${senderId}` : '/chat',

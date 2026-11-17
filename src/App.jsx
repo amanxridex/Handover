@@ -219,7 +219,9 @@ export default function App() {
     [alreadyOnboarded]
   );
 
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(
+    () => !(initialRouteSnap.activeChatId || initialRouteSnap.notificationsOpen)
+  );
   const [settings, setSettings] = useState(initialSettings);
   const [appLocked, setAppLocked] = useState(
     Boolean(
@@ -314,22 +316,33 @@ export default function App() {
   );
 
   const navigateFromNotification = useCallback((url, peer = null) => {
-    const cleanUrl = String(url || '/notifications');
+    const cleanUrl = String(url || '/notifications').split('?')[0];
     setTransitionMode('push');
-    if (cleanUrl.startsWith('/chat/')) {
-      const chatPeerId = cleanUrl.slice('/chat/'.length);
-      setNotificationsOpen(false);
-      setSettingsOpen(false);
-      if (peer) setActiveChatPeer(peer);
-      setActiveChatId(chatPeerId || null);
-      setActiveTab('chat');
-      return;
-    }
-    setActiveChatId(null);
     setSettingsOpen(false);
+    setBrandDealsOpen(false);
+    setSelectedDealId(null);
+    setViewedUsername(null);
+    setViewedUserObj(null);
     setFoundersOpen(false);
     setCreatorsOpen(false);
     setCreatePage(null);
+    setActiveCommentsPostId(null);
+    setSelectedPost(null);
+
+    if (cleanUrl.startsWith('/chat/')) {
+      const chatPeerId = cleanUrl.slice('/chat/'.length).replace(/\/+$/, '');
+      setNotificationsOpen(false);
+      if (peer) setActiveChatPeer(peer);
+      if (chatPeerId) {
+        setActiveChatId(chatPeerId);
+      } else {
+        setActiveChatId(null);
+      }
+      setActiveTab('chat');
+      return;
+    }
+
+    setActiveChatId(null);
     setActiveTab('home');
     setNotificationsOpen(true);
   }, []);

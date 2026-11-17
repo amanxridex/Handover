@@ -321,6 +321,7 @@ export async function sendOsNotification({
 
 export function sendPriorityPushToRecipient({
   recipientId,
+  kind = 'activity',
   title,
   body,
   url = '/notifications',
@@ -342,6 +343,7 @@ export function sendPriorityPushToRecipient({
         body: {
           sessionToken,
           recipientId,
+          kind,
           title: String(title || 'Handover').slice(0, 80),
           body: String(body || '').slice(0, 180),
           url: String(url || '/notifications'),

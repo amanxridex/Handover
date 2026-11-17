@@ -127,7 +127,7 @@ export async function createActivityNotification({
 
     if (data.recipientId) {
       const me = getStoredOnboardingState();
-      const actorId = me?.profileId || '';
+      const actorId = me?.id || me?.profileId || '';
       const actorName =
         me?.setupData?.name || me?.setupData?.username || 'Someone';
       const actorAvatar = me?.setupData?.avatar || '';
@@ -152,6 +152,7 @@ export async function createActivityNotification({
 
       sendPriorityPushToRecipient({
         recipientId: data.recipientId,
+        kind: type,
         title: actorName,
         body: bodyText,
         url: '/notifications',
