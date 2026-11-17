@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   FOUNDER_CATEGORIES,
   fetchFoundersDirectory,
-  getFallbackFounders,
 } from '../services/foundersService';
 import { triggerLightHaptic } from '../utils/nativeBridge';
 import { SearchIcon } from './Icons';
@@ -35,8 +34,14 @@ function LocationPinIcon() {
   );
 }
 
-export default function FoundersScreen({ onBack, onOpenChat }) {
-  const [founders, setFounders] = useState(() => getFallbackFounders());
+export default function FoundersScreen({
+  currentUserId = '',
+  onBack,
+  onOpenChat,
+  onOpenProfile,
+}) {
+  const [founders, setFounders] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [activeFounder, setActiveFounder] = useState(null);
@@ -44,8 +49,9 @@ export default function FoundersScreen({ onBack, onOpenChat }) {
   useEffect(() => {
     let mounted = true;
     fetchFoundersDirectory().then((list) => {
-      if (!mounted || !Array.isArray(list) || list.length === 0) return;
-      setFounders(list);
+      if (!mounted) return;
+      setFounders(Array.isArray(list) ? list : []);
+      setLoading(false);
     });
     return () => {
       mounted = false;
@@ -119,9 +125,13 @@ export default function FoundersScreen({ onBack, onOpenChat }) {
       </div>
 
       <div className="founders-list-scroll">
-        {visibleFounders.length === 0 ? (
+        {loading ? (
+          <div className="founders-empty">Loading founders...</div>
+        ) : visibleFounders.length === 0 ? (
           <div className="founders-empty">
-            No founders matched your search.
+            {query.trim() || selectedCategory !== 'All'
+              ? 'No founders matched your search.'
+              : 'No founders on the platform yet.'}
           </div>
         ) : (
           <div className="founders-cards-stack">
@@ -149,9 +159,9 @@ export default function FoundersScreen({ onBack, onOpenChat }) {
                     <span>{founder.location}</span>
                   </div>
                   <div className="founders-spot-rate">
-                    <span className="founders-rate-label">Rate </span>
+                    <span className="founders-rate-label">Founder · </span>
                     <span className="founders-rate-val">
-                      {founder.rating}/5
+                      {founder.fullName}
                     </span>
                   </div>
                 </div>
@@ -186,7 +196,7 @@ export default function FoundersScreen({ onBack, onOpenChat }) {
                 <p className="founders-modal-sub">
                   {activeFounder.fullName} · @{activeFounder.username}
                 </p>
-                <p className="founders-modal-sector">{activeFounder.sector}</p>
+                <p className="founders-modal-sector">{activeFounder.rawSector}</p>
               </div>
             </div>
 
@@ -200,21 +210,31 @@ export default function FoundersScreen({ onBack, onOpenChat }) {
               <button
                 type="button"
                 className="founders-modal-secondary"
-                onClick={() => setActiveFounder(null)}
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                className="founders-modal-primary"
                 onClick={() => {
-                  triggerLightHaptic();
+                  const targetUsername = activeFounder.username;
                   setActiveFounder(null);
-                  onOpenChat?.();
+                  if (targetUsername && onOpenProfile) {
+                    triggerLightHaptic();
+                    onOpenProfile(targetUsername);
+                  }
                 }}
               >
-                Message Founder
+                {onOpenProfile ? 'View Profile' : 'Close'}
               </button>
+              {activeFounder.id !== currentUserId && (
+                <button
+                  type="button"
+                  className="founders-modal-primary"
+                  onClick={() => {
+                    const target = activeFounder;
+                    triggerLightHaptic();
+                    setActiveFounder(null);
+                    onOpenChat?.(target);
+                  }}
+                >
+                  Message Founder
+                </button>
+              )}
             </div>
           </div>
         </div>

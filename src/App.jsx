@@ -1141,10 +1141,32 @@ export default function App() {
           />
         ) : activeTab === 'home' && foundersOpen ? (
           <FoundersScreen
+            currentUserId={profileId}
             onBack={goBackInHistory}
-            onOpenChat={() => {
+            onOpenProfile={(username) => {
               setFoundersOpen(false);
-              setTransitionMode('tab-right');
+              if (!username || username.toLowerCase() === setupData.username?.toLowerCase()) {
+                handleTabSelect('profile');
+              } else {
+                setTransitionMode('push');
+                setViewedUserObj(null);
+                setViewedUsername(username);
+                setActiveTab('search');
+              }
+            }}
+            onOpenChat={(founder) => {
+              setFoundersOpen(false);
+              setTransitionMode('push');
+              if (founder?.id && founder.id !== profileId) {
+                setActiveChatPeer({
+                  id: founder.id,
+                  fullName: founder.fullName,
+                  name: founder.fullName,
+                  username: founder.username,
+                  avatar: founder.userAvatar || founder.avatar,
+                });
+                setActiveChatId(founder.id);
+              }
               setActiveTab('chat');
             }}
           />

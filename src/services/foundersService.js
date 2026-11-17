@@ -1,9 +1,4 @@
-import avatarJacob from '../assets/avatar-jacob.jpg';
-import chatAlice from '../assets/chat-alice.jpg';
-import chatCharlie from '../assets/chat-charlie.jpg';
-import chatDavid from '../assets/chat-david.jpg';
-import creation5 from '../assets/creation-5.jpg';
-import profileHero from '../assets/profile-hero.jpg';
+import avatarDefault from '../assets/avatar-default.jpg';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
 export const FOUNDER_CATEGORIES = [
@@ -13,69 +8,6 @@ export const FOUNDER_CATEGORIES = [
   'Fintech',
   'E-commerce',
   'Health',
-];
-
-const CURATED_FOUNDERS = [
-  {
-    id: 'founder-ember',
-    fullName: 'Elena Vance',
-    username: 'elenavance',
-    companyName: 'Ember & Oak',
-    sector: 'Consumer',
-    location: '55 Grove Street, Brooklyn, NY',
-    companyPitch: 'Curated hospitality & creator dining spaces across NYC.',
-    rating: '4.9',
-    avatar: creation5,
-    websiteUrl: 'emberandoak.com',
-  },
-  {
-    id: 'founder-luna',
-    fullName: 'Marcus Reid',
-    username: 'marcusreid',
-    companyName: 'Luna Pay',
-    sector: 'Fintech',
-    location: '410 Sunset Blvd, Los Angeles, CA',
-    companyPitch: 'Instant creator payouts and brand escrow treasury.',
-    rating: '4.8',
-    avatar: chatDavid,
-    websiteUrl: 'lunapay.io',
-  },
-  {
-    id: 'founder-saffron',
-    fullName: 'Ananya Rao',
-    username: 'ananyarao',
-    companyName: 'Saffron AI',
-    sector: 'SaaS & AI',
-    location: '89 Curry Lane, San Francisco, CA',
-    companyPitch: 'Autonomous media workflow copilot for lean brand teams.',
-    rating: '4.7',
-    avatar: chatAlice,
-    websiteUrl: 'saffronai.co',
-  },
-  {
-    id: 'founder-marble',
-    fullName: 'Daniel Park',
-    username: 'danielpark',
-    companyName: 'The Marble Co',
-    sector: 'E-commerce',
-    location: '14 West 22nd St, New York, NY',
-    companyPitch: 'Direct-to-creator tactile homeware and studio objects.',
-    rating: '4.6',
-    avatar: chatCharlie,
-    websiteUrl: 'themarble.co',
-  },
-  {
-    id: 'founder-komorebi',
-    fullName: 'Olivia Beits',
-    username: 'oliviabeits',
-    companyName: 'Komorebi Health',
-    sector: 'Health',
-    location: '22 Willow St, Seattle, WA',
-    companyPitch: 'Mindful recovery rituals built with athletes and creators.',
-    rating: '4.8',
-    avatar: profileHero,
-    websiteUrl: 'komorebihealth.com',
-  },
 ];
 
 export function normalizeFounderSector(rawSector) {
@@ -92,12 +24,12 @@ export function normalizeFounderSector(rawSector) {
 }
 
 export function getFallbackFounders() {
-  return CURATED_FOUNDERS;
+  return [];
 }
 
 export async function fetchFoundersDirectory() {
   if (!isSupabaseConfigured || !supabase) {
-    return CURATED_FOUNDERS;
+    return [];
   }
 
   try {
@@ -109,41 +41,29 @@ export async function fetchFoundersDirectory() {
       .eq('role', 'founder')
       .eq('onboarding_completed', true)
       .order('created_at', { ascending: false })
-      .limit(30);
+      .limit(50);
 
     if (error || !Array.isArray(data)) {
-      return CURATED_FOUNDERS;
+      return [];
     }
 
-    const dbFounders = data.map((row) => ({
+    return data.map((row) => ({
       id: row.id,
       fullName: row.full_name || 'Founder',
+      name: row.full_name || 'Founder',
       username: row.username || 'founder',
       companyName: row.company_name || row.full_name || 'Startup',
       sector: normalizeFounderSector(row.sector),
       rawSector: row.sector || 'Founder',
-      location:
-        row.company_pitch ||
-        (row.sector ? `${row.sector} · Verified Founder` : 'Verified Founder'),
+      location: row.sector ? `${row.sector} · Verified Founder` : 'Verified Founder',
       companyPitch: row.company_pitch || 'Building on Handover.',
-      rating: '4.9',
-      avatar: row.company_logo_url || row.avatar_url || avatarJacob,
+      avatar: row.company_logo_url || row.avatar_url || avatarDefault,
+      userAvatar: row.avatar_url || avatarDefault,
       websiteUrl: row.website_url || '',
       instagram: row.instagram_handle || '',
       fromDb: true,
     }));
-
-    const seenNames = new Set(
-      dbFounders.map((f) => f.companyName.trim().toLowerCase())
-    );
-    const merged = [
-      ...dbFounders,
-      ...CURATED_FOUNDERS.filter(
-        (c) => !seenNames.has(c.companyName.trim().toLowerCase())
-      ),
-    ];
-    return merged;
   } catch {
-    return CURATED_FOUNDERS;
+    return [];
   }
 }
