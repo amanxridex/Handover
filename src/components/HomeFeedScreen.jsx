@@ -328,7 +328,7 @@ export default function HomeFeedScreen({
   const handlePostPhotoChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const compressed = await compressImageFile(file, 900, 0.82);
+    const compressed = await compressImageFile(file, 1440, 0.9);
     if (compressed) {
       setNewImage(compressed);
     }

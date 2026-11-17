@@ -1,25 +1,65 @@
-export function compressImageFile(file, maxSize = 256, quality = 0.84) {
+function stepDownSample(img, targetWidth, targetHeight) {
+  let curWidth = img.naturalWidth || img.width;
+  let curHeight = img.naturalHeight || img.height;
+  let source = img;
+
+  while (curWidth * 0.5 > targetWidth * 1.15 && curHeight * 0.5 > targetHeight * 1.15) {
+    const nextWidth = Math.max(targetWidth, Math.round(curWidth * 0.5));
+    const nextHeight = Math.max(targetHeight, Math.round(curHeight * 0.5));
+    const stepCanvas = document.createElement('canvas');
+    stepCanvas.width = nextWidth;
+    stepCanvas.height = nextHeight;
+    const stepCtx = stepCanvas.getContext('2d');
+    if (stepCtx) {
+      stepCtx.imageSmoothingEnabled = true;
+      stepCtx.imageSmoothingQuality = 'high';
+      stepCtx.drawImage(source, 0, 0, nextWidth, nextHeight);
+    }
+    source = stepCanvas;
+    curWidth = nextWidth;
+    curHeight = nextHeight;
+  }
+
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = targetWidth;
+  outCanvas.height = targetHeight;
+  const outCtx = outCanvas.getContext('2d');
+  if (outCtx) {
+    outCtx.imageSmoothingEnabled = true;
+    outCtx.imageSmoothingQuality = 'high';
+    outCtx.drawImage(source, 0, 0, targetWidth, targetHeight);
+  }
+  return outCanvas;
+}
+
+export function compressImageFile(file, maxSize = 1440, quality = 0.92) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error('Could not read image'));
     reader.onload = () => {
+      const dataUrl = String(reader.result || '');
       const img = new Image();
       img.onerror = () => reject(new Error('Invalid image'));
       img.onload = () => {
-        const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-        const w = Math.max(1, Math.round(img.width * scale));
-        const h = Math.max(1, Math.round(img.height * scale));
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
+        const srcW = img.naturalWidth || img.width;
+        const srcH = img.naturalHeight || img.height;
+        const maxDim = Math.max(srcW, srcH);
+
+        // Preserve original pixels untouched when already within target dimensions and lightweight
+        if (maxDim <= maxSize && file.size <= 550 * 1024) {
+          resolve(dataUrl);
+          return;
+        }
+
+        const scale = Math.min(1, maxSize / maxDim);
+        const w = Math.max(1, Math.round(srcW * scale));
+        const h = Math.max(1, Math.round(srcH * scale));
+        const canvas = stepDownSample(img, w, h);
         const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
         resolve(canvas.toDataURL(mime, quality));
       };
-      img.src = String(reader.result || '');
+      img.src = dataUrl;
     };
     reader.readAsDataURL(file);
   });
 }
-

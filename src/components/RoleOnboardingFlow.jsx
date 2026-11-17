@@ -187,7 +187,7 @@ export default function RoleOnboardingFlow({
     const file = e.target.files?.[0];
     if (!file) return;
     triggerLightHaptic();
-    const compressed = await compressImageFile(file, 256, 0.86);
+    const compressed = await compressImageFile(file, 512, 0.92);
     if (compressed) {
       setCompanyLogoUrl(compressed);
       setErrorMsg('');

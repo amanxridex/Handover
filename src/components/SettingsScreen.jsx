@@ -265,7 +265,7 @@ export default function SettingsScreen({
   const handleAvatarPick = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const compressed = await compressImageFile(file, 360, 0.85);
+    const compressed = await compressImageFile(file, 1440, 0.92);
     if (compressed) {
       setEditAvatar(compressed);
     }

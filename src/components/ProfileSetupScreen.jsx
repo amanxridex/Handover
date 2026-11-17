@@ -60,7 +60,7 @@ export default function ProfileSetupScreen({
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const compressed = await compressImageFile(file, 360, 0.84);
+    const compressed = await compressImageFile(file, 1440, 0.92);
     if (compressed) {
       setAvatarSrc(compressed);
     }
