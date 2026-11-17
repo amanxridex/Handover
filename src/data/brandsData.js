@@ -4,7 +4,6 @@ export const PROMO_BY_CATEGORY = {
   All: {
     id: 'brand-deals',
     title: 'Find brand deals',
-    subtitle: 'Direct creator payouts · Active campaigns',
     badge: 'Explore',
   },
   Dining: {

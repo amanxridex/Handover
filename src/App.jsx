@@ -1199,7 +1199,6 @@ export default function App() {
                 >
                   <div>
                     <div className="promo-title">{activePromo.title}</div>
-                    <div className="promo-subtitle">{activePromo.subtitle}</div>
                   </div>
                   <span className="promo-badge">{activePromo.badge}</span>
                 </button>
