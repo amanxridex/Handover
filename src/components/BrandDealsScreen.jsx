@@ -25,6 +25,9 @@ const CARD_PALETTES = {
   sony: 'linear-gradient(155deg, #334155 0%, #1e293b 54%, #0f172a 100%)',
 };
 
+const RECENT_COUNT = 6;
+const CARD_STRIDE = 202;
+
 function getCardPalette(logoKey) {
   return (
     CARD_PALETTES[logoKey] ||
@@ -69,7 +72,23 @@ export default function BrandDealsScreen({
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const touchStartXRef = useRef(null);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [skipTransition, setSkipTransition] = useState(false);
+  const [swipeDir, setSwipeDir] = useState('next');
+
+  const pointerRef = useRef({
+    active: false,
+    id: null,
+    startX: 0,
+    startY: 0,
+    startTime: 0,
+    locked: null, // 'x' | 'y' | null
+    dx: 0,
+  });
+  const suppressClickRef = useRef(false);
+  const settleTimerRef = useRef(null);
+  const rafRef = useRef(null);
 
   useEffect(() => {
     let mounted = true;
@@ -79,6 +98,8 @@ export default function BrandDealsScreen({
     });
     return () => {
       mounted = false;
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, []);
 
@@ -96,51 +117,134 @@ export default function BrandDealsScreen({
   // Top 6 recently added deals shown in the hero coverflow stage; rest in the grid below
   const recentDeals = useMemo(() => {
     const source = query.trim() ? filteredDeals : deals;
-    return source.slice(0, 6);
+    return source.slice(0, RECENT_COUNT);
   }, [deals, filteredDeals, query]);
 
   const restDeals = useMemo(() => {
     if (query.trim()) {
       return filteredDeals;
     }
-    return deals.slice(6);
+    return deals.slice(RECENT_COUNT);
   }, [deals, filteredDeals, query]);
 
   const safeIndex =
     recentDeals.length > 0 ? carouselIndex % recentDeals.length : 0;
   const activeDeal = recentDeals[safeIndex] || null;
-  const prevDeal =
-    recentDeals.length > 1
-      ? recentDeals[(safeIndex - 1 + recentDeals.length) % recentDeals.length]
-      : null;
-  const nextDeal =
-    recentDeals.length > 1
-      ? recentDeals[(safeIndex + 1) % recentDeals.length]
-      : null;
+
+  const visibleSlots = useMemo(() => {
+    const len = recentDeals.length;
+    if (len === 0) return [];
+    if (len === 1) return [0];
+    if (len === 2) return [0, 1];
+    if (len <= 4) return [-1, 0, 1];
+    return [-2, -1, 0, 1, 2];
+  }, [recentDeals.length]);
 
   const stepCarousel = (delta) => {
-    if (recentDeals.length <= 1) return;
+    const len = recentDeals.length;
+    if (len <= 1) return;
+
+    if (settleTimerRef.current) {
+      clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = null;
+    }
+
     triggerLightHaptic();
-    setCarouselIndex(
-      (prev) => (prev + delta + recentDeals.length) % recentDeals.length
-    );
+    setSwipeDir(delta > 0 ? 'next' : 'prev');
+    setIsDragging(false);
+    setSkipTransition(false);
+    setDragOffset(-delta * CARD_STRIDE);
+
+    settleTimerRef.current = setTimeout(() => {
+      settleTimerRef.current = null;
+      setSkipTransition(true);
+      setCarouselIndex((prev) => (prev + delta + len) % len);
+      setDragOffset(0);
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = requestAnimationFrame(() => {
+          setSkipTransition(false);
+        });
+      });
+    }, 310);
   };
 
-  const handleTouchStart = (e) => {
-    touchStartXRef.current = e.touches?.[0]?.clientX ?? null;
+  const handlePointerDown = (e) => {
+    if (recentDeals.length <= 1) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+    if (settleTimerRef.current) {
+      clearTimeout(settleTimerRef.current);
+      settleTimerRef.current = null;
+    }
+
+    pointerRef.current = {
+      active: true,
+      id: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      startTime: Date.now(),
+      locked: null,
+      dx: 0,
+    };
   };
 
-  const handleTouchEnd = (e) => {
-    if (touchStartXRef.current == null) return;
-    const endX = e.changedTouches?.[0]?.clientX;
-    if (endX == null) {
-      touchStartXRef.current = null;
+  const handlePointerMove = (e) => {
+    const st = pointerRef.current;
+    if (!st.active || st.id !== e.pointerId) return;
+
+    const dx = e.clientX - st.startX;
+    const dy = e.clientY - st.startY;
+
+    if (!st.locked) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      st.locked = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+      if (st.locked === 'x') {
+        setIsDragging(true);
+        setSkipTransition(false);
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+      }
+    }
+
+    if (st.locked !== 'x') return;
+
+    st.dx = dx;
+    const maxPull = CARD_STRIDE * 1.15;
+    const clamped = Math.max(-maxPull, Math.min(maxPull, dx));
+    setDragOffset(clamped);
+  };
+
+  const finishPointerDrag = (e) => {
+    const st = pointerRef.current;
+    if (!st.active || st.id !== e.pointerId) return;
+
+    const wasHorizontal = st.locked === 'x';
+    const dx = st.dx;
+    const dt = Math.max(16, Date.now() - st.startTime);
+    const velocity = dx / dt;
+
+    st.active = false;
+    st.locked = null;
+    if (e.currentTarget.hasPointerCapture?.(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+
+    if (!wasHorizontal) {
       return;
     }
-    const dx = endX - touchStartXRef.current;
-    touchStartXRef.current = null;
-    if (Math.abs(dx) > 36) {
+
+    setIsDragging(false);
+
+    if (Math.abs(dx) > 10) {
+      suppressClickRef.current = true;
+      setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 140);
+    }
+
+    if (Math.abs(dx) > 42 || Math.abs(velocity) > 0.35) {
       stepCarousel(dx < 0 ? 1 : -1);
+    } else {
+      setDragOffset(0);
     }
   };
 
@@ -220,68 +324,76 @@ export default function BrandDealsScreen({
           <section
             className="deals-coverflow-section"
             aria-label="Recently added brand deals"
-            onTouchStart={handleTouchStart}
-            onTouchEnd={handleTouchEnd}
           >
-            <div className="deals-coverflow-stage">
-              {prevDeal && (
-                <button
-                  type="button"
-                  className="deals-cover-card is-peek-left"
-                  style={{ background: getCardPalette(prevDeal.logoKey) }}
-                  onClick={() => stepCarousel(-1)}
-                  aria-label={`Previous deal: ${prevDeal.brandName}`}
-                >
-                  <div className="deals-cover-logo">
-                    <BrandLogoMark
-                      logoKey={prevDeal.logoKey}
-                      name={prevDeal.brandName}
-                    />
-                  </div>
-                </button>
-              )}
+            <div
+              className="deals-coverflow-stage"
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={finishPointerDrag}
+              onPointerCancel={finishPointerDrag}
+            >
+              {visibleSlots.map((slot) => {
+                const len = recentDeals.length;
+                const itemIdx = (safeIndex + slot + len) % len;
+                const deal = recentDeals[itemIdx];
+                if (!deal) return null;
 
-              <button
-                type="button"
-                className="deals-cover-card is-center"
-                style={{ background: getCardPalette(activeDeal.logoKey) }}
-                onClick={() => {
-                  triggerLightHaptic();
-                  onSelectDeal?.(activeDeal);
-                }}
-              >
-                <span className="deals-cover-watermark" aria-hidden="true">
-                  Deals
-                </span>
-                <div className="deals-cover-logo is-center">
-                  <BrandLogoMark
-                    logoKey={activeDeal.logoKey}
-                    name={activeDeal.brandName}
-                    size="hero"
-                  />
-                </div>
-              </button>
+                const pos = slot + dragOffset / CARD_STRIDE;
+                const absPos = Math.abs(pos);
+                const translateX = pos * CARD_STRIDE;
+                const scale = Math.max(0.72, 1 - absPos * 0.19);
+                const rotateDeg = Math.max(-5, Math.min(5, pos * 2.2));
+                const opacity =
+                  absPos >= 1.78 ? 0 : Math.max(0.32, 1 - absPos * 0.2);
+                const zIndex = Math.max(1, Math.round(10 - absPos * 3));
+                const isCenter = slot === 0;
 
-              {nextDeal && (
-                <button
-                  type="button"
-                  className="deals-cover-card is-peek-right"
-                  style={{ background: getCardPalette(nextDeal.logoKey) }}
-                  onClick={() => stepCarousel(1)}
-                  aria-label={`Next deal: ${nextDeal.brandName}`}
-                >
-                  <div className="deals-cover-logo">
-                    <BrandLogoMark
-                      logoKey={nextDeal.logoKey}
-                      name={nextDeal.brandName}
-                    />
-                  </div>
-                </button>
-              )}
+                return (
+                  <button
+                    key={len >= 5 ? deal.id : `${deal.id}-${slot}`}
+                    type="button"
+                    className={`deals-cover-card is-floating ${
+                      isCenter ? 'is-center-slot' : 'is-side-slot'
+                    } ${isDragging || skipTransition ? 'is-immediate' : ''}`}
+                    style={{
+                      background: getCardPalette(deal.logoKey),
+                      transform: `translate3d(${translateX}px, 0, 0) scale(${scale}) rotate(${rotateDeg}deg)`,
+                      opacity,
+                      zIndex,
+                    }}
+                    onClick={() => {
+                      if (suppressClickRef.current) return;
+                      if (slot === 0) {
+                        triggerLightHaptic();
+                        onSelectDeal?.(deal);
+                      } else {
+                        stepCarousel(slot > 0 ? 1 : -1);
+                      }
+                    }}
+                    aria-label={`${deal.brandName} brand deal`}
+                  >
+                    {isCenter && (
+                      <span className="deals-cover-watermark" aria-hidden="true">
+                        Deals
+                      </span>
+                    )}
+                    <div className="deals-cover-logo">
+                      <BrandLogoMark
+                        logoKey={deal.logoKey}
+                        name={deal.brandName}
+                        size={isCenter ? 'hero' : 'card'}
+                      />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Active Card Meta + Title */}
-            <div className="deals-active-meta-row">
+            <div
+              key={activeDeal.id}
+              className={`deals-active-meta-row is-anim-${swipeDir}`}
+            >
               <span className="deals-meta-left">{activeDeal.category}</span>
               <div className="deals-meta-center">
                 <h1 className="deals-active-title">{activeDeal.headline}</h1>
