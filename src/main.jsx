@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './styles/app.css';
+import { checkAndApplyAppUpdate } from './utils/appUpdater';
 import { initNativeShell } from './utils/nativeBridge';
 
 initNativeShell();
@@ -44,12 +45,12 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 
         document.addEventListener('visibilitychange', () => {
           if (document.visibilityState === 'visible') {
-            reg.update().catch(() => {});
+            checkAndApplyAppUpdate().catch(() => {});
           }
         });
 
         setInterval(() => {
-          reg.update().catch(() => {});
+          checkAndApplyAppUpdate().catch(() => {});
         }, 5 * 60 * 1000);
       })
       .catch(() => {});

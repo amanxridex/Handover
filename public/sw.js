@@ -111,8 +111,8 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Never serve stale sw.js
-  if (url.pathname === '/sw.js') {
+  // Never serve stale sw.js or version.json
+  if (url.pathname === '/sw.js' || url.pathname === '/version.json') {
     event.respondWith(fetch(event.request, { cache: 'no-store' }));
     return;
   }

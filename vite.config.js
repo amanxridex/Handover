@@ -3,20 +3,27 @@ import path from 'node:path';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const BUILD_VERSION = `v${Date.now()}`;
+
 function handoverPwaPlugin() {
   return {
     name: 'handover-pwa-stamp',
     writeBundle(options) {
       const outDir = options.dir || path.resolve(process.cwd(), 'dist');
       const swPath = path.join(outDir, 'sw.js');
-      const version = `v${Date.now()}`;
 
       if (fs.existsSync(swPath)) {
         const swContent = fs
           .readFileSync(swPath, 'utf8')
-          .replace(/__SW_CACHE_VERSION__/g, version);
+          .replace(/__SW_CACHE_VERSION__/g, BUILD_VERSION);
         fs.writeFileSync(swPath, swContent, 'utf8');
       }
+
+      fs.writeFileSync(
+        path.join(outDir, 'version.json'),
+        JSON.stringify({ version: BUILD_VERSION }, null, 2),
+        'utf8'
+      );
 
       // Include SPA rewrites and no-cache headers inside prebuilt dist output
       const distVercelConfig = {
@@ -24,6 +31,15 @@ function handoverPwaPlugin() {
         headers: [
           {
             source: '/sw.js',
+            headers: [
+              {
+                key: 'Cache-Control',
+                value: 'no-cache, no-store, must-revalidate',
+              },
+            ],
+          },
+          {
+            source: '/version.json',
             headers: [
               {
                 key: 'Cache-Control',
@@ -58,6 +74,9 @@ function handoverPwaPlugin() {
 }
 
 export default defineConfig({
+  define: {
+    __APP_BUILD_VERSION__: JSON.stringify(BUILD_VERSION),
+  },
   plugins: [react(), handoverPwaPlugin()],
   server: {
     host: true,

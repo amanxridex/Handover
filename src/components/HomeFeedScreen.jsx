@@ -15,6 +15,7 @@ import {
   getClientActorKey,
   togglePostLikeInDb,
 } from '../services/feedService';
+import { checkAndApplyAppUpdate } from '../utils/appUpdater';
 import { triggerLightHaptic, triggerSuccessHaptic } from '../utils/nativeBridge';
 import BottomNav from './BottomNav';
 import CommentsDrawer from './CommentsDrawer';
@@ -208,18 +209,15 @@ export default function HomeFeedScreen({
     setRefreshDone(false);
     setPullDistance(62);
     try {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistration().then((reg) => {
-          reg?.update().catch(() => { });
-          if (reg?.waiting) {
-            reg.waiting.postMessage('SKIP_WAITING');
-          }
-        });
-      }
-      await Promise.all([
+      const [updating] = await Promise.all([
+        checkAndApplyAppUpdate(),
         loadFeedData(),
         new Promise((resolve) => setTimeout(resolve, 680)),
       ]);
+      if (updating) {
+        showNotice('Updating app to latest version...');
+        return;
+      }
       triggerSuccessHaptic();
       setIsRefreshing(false);
       setRefreshDone(true);
