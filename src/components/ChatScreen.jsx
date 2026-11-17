@@ -291,8 +291,6 @@ export default function ChatScreen({
       >
         {/* Orange Rounded Conversation Container */}
         <div className="chat-thread-surface">
-          <div className="chat-thread-header-fade" aria-hidden="true" />
-
           <header className="chat-thread-header">
             <div className="chat-thread-left">
               <button
