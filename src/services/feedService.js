@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { createActivityNotification } from './notificationsService';
 import { getStoredSessionToken } from './profileService';
 
 const ACTOR_KEY_STORAGE = 'handover_actor_key_v1';
@@ -282,6 +283,12 @@ export async function togglePostLikeInDb({
     }
 
     await Promise.all(tasks);
+    if (liked && isUuid(postKey)) {
+      createActivityNotification({
+        type: 'like',
+        postId: postKey,
+      });
+    }
   } catch {
     // Ignore network error
   }
@@ -393,6 +400,14 @@ export async function createPostComment({
 
     if (error || !data) return null;
 
+    if (isUuid(postKey)) {
+      createActivityNotification({
+        type: 'comment',
+        postId: postKey,
+        commentText: data.body,
+      });
+    }
+
     return {
       id: data.id,
       postKey: data.post_key,
@@ -453,6 +468,12 @@ export async function toggleCommentLikeInDb({
     }
 
     await Promise.all(tasks);
+    if (liked && isUuid(postKey)) {
+      createActivityNotification({
+        type: 'like',
+        postId: postKey,
+      });
+    }
   } catch {
     // Ignore network error
   }

@@ -1,15 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import avatarDefault from './assets/avatar-default.jpg';
-import avatarJacob from './assets/avatar-jacob.jpg';
-import chatAlice from './assets/chat-alice.jpg';
-import chatCharlie from './assets/chat-charlie.jpg';
-import chatDavid from './assets/chat-david.jpg';
-import creation3 from './assets/creation-3.jpg';
-import creation5 from './assets/creation-5.jpg';
-import feedPillowFight from './assets/feed-pillow-fight.jpg';
-import feedWarmPost from './assets/feed-warm-post.jpg';
 import heroCollage from './assets/hero-collage.png';
-import profileHero from './assets/profile-hero.jpg';
 import {
   BackTriangleIcon,
   ChatTabIcon,
@@ -47,7 +38,14 @@ import {
   saveOnboardedProfile,
   searchProfilesByName,
   syncProfileFromSupabase,
+  toggleFollowProfile,
 } from './services/profileService';
+import {
+  fetchMyNotifications,
+  markAllNotificationsReadInDb,
+  markNotificationReadInDb,
+  subscribeRealtimeChannel,
+} from './services/notificationsService';
 import {
   clearStoredSettings,
   DEFAULT_SETTINGS,
@@ -56,67 +54,6 @@ import {
   saveUserSettings,
 } from './services/settingsService';
 import { triggerLightHaptic } from './utils/nativeBridge';
-
-const INITIAL_NOTIFICATIONS = [
-  {
-    id: 'n1',
-    type: 'follow',
-    actor: 'Olivia Beits',
-    avatar: profileHero,
-    time: '2m ago',
-    unread: true,
-    followingBack: false,
-  },
-  {
-    id: 'n2',
-    type: 'like',
-    actor: '@Maria Theodor',
-    avatar: creation5,
-    time: '4m ago',
-    unread: true,
-    postTitle: 'Check out my pillow fight with beautiful views',
-    postThumb: feedPillowFight,
-  },
-  {
-    id: 'n3',
-    type: 'comment',
-    actor: '@Alice Johnson',
-    avatar: chatAlice,
-    time: '12m ago',
-    unread: true,
-    comment: 'Those twilight colors are unreal 🔥',
-    postThumb: feedWarmPost,
-  },
-  {
-    id: 'n4',
-    type: 'follow',
-    actor: 'David Smith',
-    avatar: chatDavid,
-    time: '24m ago',
-    unread: true,
-    followingBack: false,
-  },
-  {
-    id: 'n5',
-    type: 'like',
-    actor: '@Charlie Brown',
-    avatar: chatCharlie,
-    time: '38m ago',
-    unread: true,
-    postTitle: 'Golden hour above the skyline',
-    postThumb: feedWarmPost,
-  },
-  {
-    id: 'n6',
-    type: 'comment',
-    actor: '@Jacob Jones',
-    avatar: avatarJacob,
-    time: '2h ago',
-    unread: true,
-    comment: 'Need this exact camera preset!',
-    postThumb: creation3,
-  },
-];
 
 const TABS = [
   { id: 'home', label: 'Home', Icon: HomeTabIcon },
@@ -332,7 +269,7 @@ export default function App() {
   const [createPage, setCreatePage] = useState(
     initialRouteSnap.createPage || null
   );
-  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState([]);
   const [exitHint, setExitHint] = useState(false);
   const [transitionMode, setTransitionMode] = useState('none'); // none | push | pop | tab-right | tab-left
 
@@ -345,6 +282,33 @@ export default function App() {
     () => notifications.filter((n) => n.unread).length,
     [notifications]
   );
+
+  const refreshNotifications = useCallback(async () => {
+    if (!profileId) {
+      setNotifications([]);
+      return;
+    }
+    const rows = await fetchMyNotifications();
+    if (Array.isArray(rows)) {
+      setNotifications(rows);
+    }
+  }, [profileId]);
+
+  useEffect(() => {
+    refreshNotifications();
+    if (!profileId) return undefined;
+
+    const unsubscribe = subscribeRealtimeChannel(
+      `notif:${profileId}`,
+      'new_notification',
+      refreshNotifications
+    );
+    const timer = setInterval(refreshNotifications, 6000);
+    return () => {
+      unsubscribe();
+      clearInterval(timer);
+    };
+  }, [profileId, notificationsOpen, refreshNotifications]);
 
   const navSnapshot = useMemo(
     () => ({
@@ -1010,26 +974,65 @@ export default function App() {
           <NotificationsScreen
             notifications={notifications}
             onBack={goBackInHistory}
-            onFollowBack={(id) =>
+            onFollowBack={async (item) => {
+              const targetNotifId = typeof item === 'string' ? item : item?.id;
+              const targetActorId = typeof item === 'object' ? item?.actorId : null;
+
               setNotifications((prev) =>
                 prev.map((n) =>
-                  n.id === id ? { ...n, followingBack: true, unread: false } : n
+                  n.id === targetNotifId || (targetActorId && n.actorId === targetActorId)
+                    ? { ...n, followingBack: true, unread: false }
+                    : n
                 )
-              )
-            }
-            onMarkAllRead={() =>
+              );
+
+              if (targetNotifId) {
+                markNotificationReadInDb(targetNotifId);
+              }
+              if (targetActorId) {
+                const res = await toggleFollowProfile(targetActorId);
+                if (!res?.ok) {
+                  setNotifications((prev) =>
+                    prev.map((n) =>
+                      n.id === targetNotifId ? { ...n, followingBack: false } : n
+                    )
+                  );
+                  return false;
+                }
+                const isNowFollowing = Boolean(res.following);
+                setNotifications((prev) =>
+                  prev.map((n) =>
+                    n.id === targetNotifId || (targetActorId && n.actorId === targetActorId)
+                      ? { ...n, followingBack: isNowFollowing }
+                      : n
+                  )
+                );
+                return isNowFollowing;
+              }
+              return true;
+            }}
+            onMarkAllRead={() => {
               setNotifications((prev) =>
                 prev.map((n) => ({ ...n, unread: false }))
-              )
-            }
-            onMarkRead={(id) =>
+              );
+              markAllNotificationsReadInDb();
+            }}
+            onMarkRead={(id) => {
               setNotifications((prev) =>
                 prev.map((n) => (n.id === id ? { ...n, unread: false } : n))
-              )
-            }
-            onOpenProfile={() => {
+              );
+              markNotificationReadInDb(id);
+            }}
+            onOpenProfile={(item) => {
               setNotificationsOpen(false);
-              handleTabSelect('profile');
+              if (item?.actorUsername) {
+                setTransitionMode('push');
+                setViewedUserObj(null);
+                setViewedUsername(item.actorUsername);
+                setActiveTab('search');
+              } else {
+                handleTabSelect('profile');
+              }
             }}
           />
         ) : activeTab === 'home' ? (
@@ -1077,10 +1080,19 @@ export default function App() {
             tabs={TABS}
             activeTab={activeTab}
             onSelectTab={handleTabSelect}
+            currentUserId={profileId}
             activeThreadId={activeChatId}
             activePeer={activeChatPeer}
             onOpenThread={(id) => setActiveChatId(id)}
             onCloseThread={goBackInHistory}
+            onOpenProfile={(username) => {
+              if (!username) return;
+              setTransitionMode('push');
+              setActiveChatId(null);
+              setViewedUserObj(null);
+              setViewedUsername(username);
+              setActiveTab('search');
+            }}
           />
         ) : activeTab === 'search' && viewedUsername ? (
           <ProfileScreen

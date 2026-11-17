@@ -1,17 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import avatarDefault from '../assets/avatar-default.jpg';
-import chatAlice from '../assets/chat-alice.jpg';
-import chatBella from '../assets/chat-bella.jpg';
-import chatCharlie from '../assets/chat-charlie.jpg';
-import chatDavid from '../assets/chat-david.jpg';
-import creation3 from '../assets/creation-3.jpg';
-import creation6 from '../assets/creation-6.jpg';
 import {
   fetchDirectMessages,
   fetchMyDirectThreads,
   isUuid,
   sendDirectMessage,
 } from '../services/chatService';
+import { subscribeRealtimeChannel } from '../services/realtimeService';
 import { triggerLightHaptic } from '../utils/nativeBridge';
 import BottomNav from './BottomNav';
 import {
@@ -20,125 +15,6 @@ import {
   PaperPlaneIcon,
   UserInfoIcon,
 } from './Icons';
-
-const INITIAL_CHATS = [
-  {
-    id: 'david',
-    shortName: 'David',
-    name: 'David Smith',
-    time: 'Just Now',
-    avatar: chatDavid,
-    preview: 'So, are we still going to watch that movie tonight?',
-    messages: [
-      { id: 'd0', from: 'them', text: 'Also, the soundtrack was 🔥🔥🔥', time: '10:10 PM' },
-      {
-        id: 'd1',
-        from: 'me',
-        text: '100%!\nI actually added one of the tracks to my playlist right after the movie',
-        time: '10:12 PM',
-      },
-      { id: 'd2', from: 'them', text: 'Same here 🙌', time: '10:13 PM' },
-      { id: 'd3', from: 'them', text: 'Been listening to it all morning', time: '10:13 PM' },
-      { id: 'd4', from: 'me', text: 'You know what?', time: '10:23 PM' },
-      {
-        id: 'd5',
-        from: 'me',
-        text: "If they ever make a sequel, we're going together. No excuses 😉",
-        time: '10:24 PM',
-      },
-      { id: 'd6', from: 'them', text: 'Deal!', time: '10:26 PM' },
-      { id: 'd7', from: 'them', text: "And popcorn's on you 😋🍿", time: '10:26 PM' },
-      {
-        id: 'd8',
-        from: 'me',
-        text: 'Haha, fine... as long as you bring the drinks!',
-        time: '10:28 PM',
-      },
-      { id: 'd9', from: 'them', text: 'Done ✅', time: '10:31 PM' },
-    ],
-  },
-  {
-    id: 'charlie',
-    shortName: 'Charlie',
-    name: 'Charlie Brown',
-    time: '12:54 PM',
-    avatar: chatCharlie,
-    preview: "I can't believe that ending, totally unexpected!",
-    messages: [
-      { id: 'c0', from: 'me', text: 'Did you finish watching the finale?', time: '12:51 PM' },
-      {
-        id: 'c1',
-        from: 'them',
-        text: "I can't believe that ending, totally unexpected!",
-        time: '12:54 PM',
-      },
-    ],
-  },
-  {
-    id: 'alice',
-    shortName: 'Alice',
-    name: 'Alice Johnson',
-    time: 'Yesterday',
-    avatar: chatAlice,
-    preview: 'Hey, did you finish the series I recommended?',
-    messages: [
-      {
-        id: 'a1',
-        from: 'them',
-        text: 'Hey, did you finish the series I recommended?',
-        time: '8:15 PM',
-      },
-    ],
-  },
-  {
-    id: 'mia',
-    shortName: 'Mia',
-    name: 'Mia Mitchell',
-    time: 'Yesterday',
-    avatar: creation3,
-    preview: "Don't forget tomorrow starts at 9:00 sharp ⏰",
-    messages: [
-      {
-        id: 'm1',
-        from: 'them',
-        text: "Don't forget tomorrow starts at 9:00 sharp ⏰",
-        time: '6:40 PM',
-      },
-    ],
-  },
-  {
-    id: 'ivy',
-    shortName: 'Ivy',
-    name: 'Ivy Harris',
-    time: 'Sep, 28',
-    avatar: creation6,
-    preview: 'This soundtrack is stuck in my head all day 😂',
-    messages: [
-      {
-        id: 'i1',
-        from: 'them',
-        text: 'This soundtrack is stuck in my head all day 😂',
-        time: '3:22 PM',
-      },
-    ],
-  },
-  {
-    id: 'bella',
-    shortName: 'Bella',
-    name: 'Bella Nelson',
-    time: 'Sep, 26',
-    avatar: chatBella,
-    preview: "Let's catch up this Friday once you're free!",
-    messages: [
-      {
-        id: 'b1',
-        from: 'them',
-        text: "Let's catch up this Friday once you're free!",
-        time: '11:05 AM',
-      },
-    ],
-  },
-];
 
 function ChatSearchIcon() {
   return (
@@ -173,43 +49,114 @@ export default function ChatScreen({
   tabs,
   activeTab,
   onSelectTab,
+  currentUserId = '',
   activeThreadId,
   activePeer = null,
   onOpenThread,
   onCloseThread,
+  onOpenProfile,
 }) {
   const messagesEndRef = useRef(null);
-  const [chats, setChats] = useState(INITIAL_CHATS);
+  const [chats, setChats] = useState([]);
+  const [loadingThreads, setLoadingThreads] = useState(true);
   const [query, setQuery] = useState('');
   const [storiesOpen, setStoriesOpen] = useState(true);
   const [draft, setDraft] = useState('');
   const [notice, setNotice] = useState('');
 
-  // Load persisted Supabase DM threads
-  useEffect(() => {
-    let active = true;
-    fetchMyDirectThreads().then((dbThreads) => {
-      if (!active || !Array.isArray(dbThreads) || dbThreads.length === 0) {
-        return;
-      }
-      setChats((prev) => {
-        const dbIds = new Set(dbThreads.map((t) => t.id));
-        const normalizedDb = dbThreads.map((t) => {
-          const existing = prev.find((p) => p.id === t.id);
-          return {
-            ...t,
-            avatar: t.avatar || avatarDefault,
-            messages: existing?.messages || [],
-          };
-        });
-        const rest = prev.filter((p) => !dbIds.has(p.id));
-        return [...normalizedDb, ...rest];
+  const refreshThreads = useCallback(async () => {
+    const dbThreads = await fetchMyDirectThreads();
+    setLoadingThreads(false);
+    if (!Array.isArray(dbThreads)) return;
+
+    setChats((prev) => {
+      const prevById = new Map(prev.map((p) => [p.id, p]));
+      const dbIds = new Set(dbThreads.map((t) => t.id));
+      const normalizedDb = dbThreads.map((t) => {
+        const existing = prevById.get(t.id);
+        return {
+          ...t,
+          avatar: t.avatar || avatarDefault,
+          messages: existing?.messages || [],
+        };
       });
+
+      // Keep unsent activePeer at top if user just navigated via "Message" button
+      const unsentPeer =
+        activePeer?.id && !dbIds.has(activePeer.id)
+          ? prevById.get(activePeer.id) || {
+              id: activePeer.id,
+              shortName:
+                (activePeer.fullName || activePeer.name || 'Member').split(' ')[0],
+              name: activePeer.fullName || activePeer.name || 'Handover Member',
+              username: activePeer.username || '',
+              time: 'New chat',
+              avatar: activePeer.avatar || avatarDefault,
+              preview: 'Start a conversation',
+              isDbThread: true,
+              messages: [],
+            }
+          : null;
+
+      return unsentPeer ? [unsentPeer, ...normalizedDb] : normalizedDb;
     });
-    return () => {
-      active = false;
-    };
-  }, []);
+  }, [activePeer]);
+
+  const loadActiveMessages = useCallback(async () => {
+    if (!activeThreadId || !isUuid(activeThreadId)) return;
+    const res = await fetchDirectMessages(activeThreadId);
+    if (!res) return;
+
+    setChats((prev) => {
+      const exists = prev.some((c) => c.id === activeThreadId);
+      const peerName =
+        res.peer?.name ||
+        activePeer?.fullName ||
+        activePeer?.name ||
+        'Handover Member';
+      const lastMsg =
+        res.messages.length > 0
+          ? res.messages[res.messages.length - 1]
+          : null;
+
+      if (!exists) {
+        return [
+          {
+            id: activeThreadId,
+            shortName: peerName.split(' ')[0] || peerName,
+            name: peerName,
+            username: res.peer?.username || activePeer?.username || '',
+            avatar: res.peer?.avatar || activePeer?.avatar || avatarDefault,
+            time: lastMsg?.time || 'New chat',
+            preview: lastMsg?.text || 'Start a conversation',
+            isDbThread: true,
+            messages: res.messages,
+          },
+          ...prev,
+        ];
+      }
+
+      return prev.map((c) =>
+        c.id === activeThreadId
+          ? {
+              ...c,
+              name: res.peer?.name || c.name,
+              shortName: res.peer?.shortName || c.shortName,
+              username: res.peer?.username || c.username || '',
+              avatar: res.peer?.avatar || c.avatar || avatarDefault,
+              preview: lastMsg?.text || c.preview,
+              time: lastMsg?.time || c.time,
+              messages: res.messages,
+            }
+          : c
+      );
+    });
+  }, [activeThreadId, activePeer]);
+
+  // Initial load + DB sync when user switches or peer opens
+  useEffect(() => {
+    refreshThreads();
+  }, [currentUserId, refreshThreads]);
 
   // Ensure an activePeer tapped from Search/Profile exists in thread list even before 1st message
   useEffect(() => {
@@ -236,67 +183,29 @@ export default function ChatScreen({
     });
   }, [activeThreadId, activePeer]);
 
-  // Load live messages for DB UUID threads and refresh while thread is open
+  // Load live messages for open thread + subscribe to real-time broadcasts + backup poll
   useEffect(() => {
-    if (!activeThreadId || !isUuid(activeThreadId)) return;
-    let active = true;
+    loadActiveMessages();
+  }, [loadActiveMessages]);
 
-    const loadMessages = () => {
-      fetchDirectMessages(activeThreadId).then((res) => {
-        if (!active || !res) return;
-        setChats((prev) => {
-          const exists = prev.some((c) => c.id === activeThreadId);
-          const peerName =
-            res.peer?.name ||
-            activePeer?.fullName ||
-            activePeer?.name ||
-            'Handover Member';
-          const lastMsg =
-            res.messages.length > 0
-              ? res.messages[res.messages.length - 1]
-              : null;
-
-          if (!exists) {
-            return [
-              {
-                id: activeThreadId,
-                shortName: peerName.split(' ')[0] || peerName,
-                name: peerName,
-                username: res.peer?.username || activePeer?.username || '',
-                avatar: res.peer?.avatar || activePeer?.avatar || avatarDefault,
-                time: lastMsg?.time || 'New chat',
-                preview: lastMsg?.text || 'Start a conversation',
-                isDbThread: true,
-                messages: res.messages,
-              },
-              ...prev,
-            ];
-          }
-
-          return prev.map((c) =>
-            c.id === activeThreadId
-              ? {
-                  ...c,
-                  name: res.peer?.name || c.name,
-                  shortName: res.peer?.shortName || c.shortName,
-                  avatar: res.peer?.avatar || c.avatar || avatarDefault,
-                  preview: lastMsg?.text || c.preview,
-                  time: lastMsg?.time || c.time,
-                  messages: res.messages,
-                }
-              : c
-          );
-        });
-      });
+  useEffect(() => {
+    const syncAll = () => {
+      refreshThreads();
+      if (activeThreadId && isUuid(activeThreadId)) {
+        loadActiveMessages();
+      }
     };
 
-    loadMessages();
-    const timer = setInterval(loadMessages, 4000);
+    const unsubscribe = currentUserId
+      ? subscribeRealtimeChannel(`dm:${currentUserId}`, 'new_dm', syncAll)
+      : () => {};
+
+    const timer = setInterval(syncAll, 3500);
     return () => {
-      active = false;
+      unsubscribe();
       clearInterval(timer);
     };
-  }, [activeThreadId, activePeer]);
+  }, [currentUserId, activeThreadId, refreshThreads, loadActiveMessages]);
 
   const filteredChats = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -416,9 +325,13 @@ export default function ChatScreen({
                 className="chat-thread-pill-btn"
                 onClick={() => {
                   triggerLightHaptic();
-                  showToast(`${activeThread.name} · Active`);
+                  if (activeThread.username && onOpenProfile) {
+                    onOpenProfile(activeThread.username);
+                  } else {
+                    showToast(`${activeThread.name} · Active`);
+                  }
                 }}
-                aria-label={`${activeThread.name} info`}
+                aria-label={`${activeThread.name} profile`}
               >
                 <UserInfoIcon />
               </button>
@@ -426,6 +339,16 @@ export default function ChatScreen({
           </header>
 
           <div className="chat-thread-messages">
+            {activeThread.messages.length === 0 && (
+              <div className="profile-empty-state" style={{ marginTop: 48 }}>
+                <span className="profile-empty-title" style={{ color: '#fff' }}>
+                  Say hi to {activeThread.shortName}
+                </span>
+                <p className="profile-empty-sub" style={{ color: 'rgba(255,255,255,0.82)' }}>
+                  Messages you send here are saved and delivered in real time.
+                </p>
+              </div>
+            )}
             {activeThread.messages.map((msg) => {
               const isShort = msg.text.length <= 36 && !msg.text.includes('\n');
               return (
@@ -516,13 +439,13 @@ export default function ChatScreen({
                 className="chat-contact-item"
                 onClick={() => {
                   triggerLightHaptic();
-                  showToast('Invite a friend to Handover');
+                  onSelectTab('search');
                 }}
               >
                 <span className="chat-add-circle">
                   <span className="chat-add-dashed">+</span>
                 </span>
-                <span className="chat-contact-name">Add</span>
+                <span className="chat-contact-name">Find</span>
               </button>
 
               {chats.slice(0, 4).map((person) => (
@@ -549,31 +472,60 @@ export default function ChatScreen({
 
         {/* Conversation List */}
         <div className="chat-list" role="list">
-          {filteredChats.map((chat) => (
-            <button
-              key={chat.id}
-              type="button"
-              role="listitem"
-              className="chat-row"
-              onClick={() => {
-                triggerLightHaptic();
-                onOpenThread(chat.id);
-              }}
-            >
-              <img
-                src={chat.avatar}
-                alt={chat.name}
-                className="chat-row-avatar"
-              />
-              <div className="chat-row-body">
-                <div className="chat-row-top">
-                  <span className="chat-row-name">{chat.name}</span>
-                  <span className="chat-row-time">{chat.time}</span>
+          {loadingThreads && chats.length === 0 ? (
+            <div className="profile-empty-state">
+              <p className="profile-empty-sub">Loading your conversations...</p>
+            </div>
+          ) : filteredChats.length === 0 ? (
+            <div className="profile-empty-state">
+              <span className="profile-empty-title">
+                {query.trim() ? 'No matching chats' : 'No messages yet'}
+              </span>
+              <p className="profile-empty-sub">
+                {query.trim()
+                  ? 'Try searching another name.'
+                  : 'Find founders or creators in Search and tap Message to start a live conversation.'}
+              </p>
+              {!query.trim() && (
+                <button
+                  type="button"
+                  className="profile-empty-cta"
+                  onClick={() => {
+                    triggerLightHaptic();
+                    onSelectTab('search');
+                  }}
+                >
+                  Find people
+                </button>
+              )}
+            </div>
+          ) : (
+            filteredChats.map((chat) => (
+              <button
+                key={chat.id}
+                type="button"
+                role="listitem"
+                className="chat-row"
+                onClick={() => {
+                  triggerLightHaptic();
+                  onOpenThread(chat.id);
+                }}
+              >
+                <img
+                  src={chat.avatar}
+                  alt={chat.name}
+                  className="chat-row-avatar"
+                />
+                <div className="chat-row-body">
+                  <div className="chat-row-top">
+                    <span className="chat-row-name">{chat.name}</span>
+                    <span className="chat-row-time">{chat.time}</span>
+                  </div>
+                  <p className="chat-row-preview">{chat.preview}</p>
                 </div>
-                <p className="chat-row-preview">{chat.preview}</p>
-              </div>
-            </button>
-          ))}
+              </button>
+            ))
+          )}
         </div>
       </div>
 

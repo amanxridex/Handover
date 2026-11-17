@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
+import avatarDefault from '../assets/avatar-default.jpg';
 import { triggerLightHaptic } from '../utils/nativeBridge';
 import { BackChevronIcon, CommentBubbleIcon, HeartIcon } from './Icons';
 
@@ -226,28 +227,36 @@ export default function NotificationsScreen({
 
         {/* Notifications List */}
         <div className="notif-list">
-          {filtered.map((item) => (
-            <article
-              key={item.id}
-              className={`notif-card ${item.unread ? 'unread' : ''}`}
-              onClick={() => onMarkRead(item.id)}
-            >
-              <div className="notif-card-main">
-                <button
-                  type="button"
-                  className="notif-avatar-wrap"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    triggerLightHaptic();
-                    onOpenProfile();
-                  }}
-                  aria-label={`View ${item.actor} profile`}
-                >
-                  <img
-                    src={item.avatar}
-                    alt={item.actor}
-                    className="notif-avatar"
-                  />
+          {filtered.length === 0 ? (
+            <div className="profile-empty-state">
+              <span className="profile-empty-title">No notifications yet</span>
+              <p className="profile-empty-sub">
+                When someone follows you or engages with your posts, it shows up here.
+              </p>
+            </div>
+          ) : (
+            filtered.map((item) => (
+              <article
+                key={item.id}
+                className={`notif-card ${item.unread ? 'unread' : ''}`}
+                onClick={() => onMarkRead(item.id)}
+              >
+                <div className="notif-card-main">
+                  <button
+                    type="button"
+                    className="notif-avatar-wrap"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      triggerLightHaptic();
+                      onOpenProfile(item);
+                    }}
+                    aria-label={`View ${item.actor} profile`}
+                  >
+                    <img
+                      src={item.avatar || avatarDefault}
+                      alt={item.actor}
+                      className="notif-avatar"
+                    />
                   <span className={`notif-type-badge ${item.type}`} aria-hidden="true">
                     {item.type === 'like' && <HeartIcon filled />}
                     {item.type === 'comment' && <CommentBubbleIcon />}
@@ -329,9 +338,13 @@ export default function NotificationsScreen({
                   <SlideToFollow
                     actorName={item.actor}
                     isFollowing={item.followingBack}
-                    onFollow={() => {
-                      onFollowBack(item.id);
-                      showToast(`You are now following ${item.actor}`);
+                    onFollow={async () => {
+                      const ok = await onFollowBack(item);
+                      if (ok !== false) {
+                        showToast(`You are now following ${item.actor}`);
+                      } else {
+                        showToast(`Could not follow ${item.actor}`);
+                      }
                     }}
                   />
                 </div>
@@ -357,7 +370,8 @@ export default function NotificationsScreen({
                 </form>
               )}
             </article>
-          ))}
+            ))
+          )}
         </div>
       </div>
 

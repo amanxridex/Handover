@@ -1,5 +1,6 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { getStoredSessionToken } from './profileService';
+import { broadcastRealtimeEvent } from './realtimeService';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -125,6 +126,12 @@ export async function sendDirectMessage(recipientId, text) {
         error: data?.error || error?.message || 'Failed to send message.',
       };
     }
+
+    broadcastRealtimeEvent(`dm:${recipientId}`, 'new_dm', {
+      id: data.message.id,
+      text: data.message.text,
+      createdAt: data.message.createdAt,
+    });
 
     return {
       ok: true,

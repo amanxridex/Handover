@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { broadcastRealtimeEvent } from './realtimeService';
 
 const STORAGE_KEY = 'handover_profile_v1';
 const SESSION_TOKEN_KEY = 'handover_session_token_v1';
@@ -460,6 +461,11 @@ export async function toggleFollowProfile(targetProfileId) {
         ok: false,
         error: data?.error || error?.message || 'Could not update follow status.',
       };
+    }
+    if (Boolean(data.following)) {
+      broadcastRealtimeEvent(`notif:${targetProfileId}`, 'new_notification', {
+        type: 'follow',
+      });
     }
     return {
       ok: true,
