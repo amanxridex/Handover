@@ -270,6 +270,7 @@ export async function createBrandDeal({
   minRequirements,
   brief,
   paymentAmount,
+  currency = 'USD',
   brandLogoUrl,
 }) {
   const cleanBrand = String(brandName || '').trim();
@@ -278,7 +279,10 @@ export async function createBrandDeal({
     return { ok: false, error: 'Enter a brand name and valid payment amount.' };
   }
 
-  const formattedAmount = `$${Math.round(numericAmount).toLocaleString('en-US')}`;
+  const cleanCurrency = currency === 'INR' ? 'INR' : 'USD';
+  const symbol = cleanCurrency === 'INR' ? '₹' : '$';
+  const locale = cleanCurrency === 'INR' ? 'en-IN' : 'en-US';
+  const formattedAmount = `${symbol}${Math.round(numericAmount).toLocaleString(locale)}`;
   const paymentCents = Math.round(numericAmount * 100);
   const cleanObjectives = (objectives || []).map((s) => String(s || '').trim()).filter(Boolean);
   const cleanReqs = (minRequirements || []).map((s) => String(s || '').trim()).filter(Boolean);
@@ -303,6 +307,7 @@ export async function createBrandDeal({
       p_min_requirements: cleanReqs,
       p_brief: cleanBrief,
       p_brand_logo_url: brandLogoUrl || null,
+      p_currency: cleanCurrency,
     });
 
     if (error || !data?.ok) {

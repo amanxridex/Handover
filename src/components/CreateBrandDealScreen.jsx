@@ -33,6 +33,7 @@ export default function CreateBrandDealScreen({
   const [objectives, setObjectives] = useState(['', '', '']);
   const [brief, setBrief] = useState('');
   const [minRequirements, setMinRequirements] = useState(['', '', '']);
+  const [currency, setCurrency] = useState('USD'); // USD | INR
   const [paymentInput, setPaymentInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -93,6 +94,7 @@ export default function CreateBrandDealScreen({
       minRequirements: cleanReqs,
       brief: cleanBrief,
       paymentAmount: numericAmount,
+      currency,
       brandLogoUrl: currentUser?.companyLogoUrl || null,
     });
 
@@ -107,9 +109,13 @@ export default function CreateBrandDealScreen({
     onPublished?.(res.deal);
   };
 
+  const currencySymbol = currency === 'INR' ? '₹' : '$';
+
   const formattedPreview = (() => {
     const n = Number(String(paymentInput || '').replace(/[^0-9.]/g, ''));
-    return n > 0 ? `$${Math.round(n).toLocaleString('en-US')}` : '';
+    if (n <= 0) return '';
+    const locale = currency === 'INR' ? 'en-IN' : 'en-US';
+    return `${currencySymbol}${Math.round(n).toLocaleString(locale)}`;
   })();
 
   return (
@@ -229,17 +235,41 @@ export default function CreateBrandDealScreen({
         </div>
 
         <div className="composer-section">
-          <label className="composer-field-label" htmlFor="deal-payment-input">
-            Payment Amount
-          </label>
+          <div className="composer-amount-head">
+            <label className="composer-field-label" htmlFor="deal-payment-input">
+              Payment Amount
+            </label>
+            <div
+              className="composer-currency-switch"
+              role="group"
+              aria-label="Choose currency"
+            >
+              {['USD', 'INR'].map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  className={`composer-currency-opt ${
+                    currency === code ? 'active' : ''
+                  }`}
+                  onClick={() => {
+                    triggerLightHaptic();
+                    setCurrency(code);
+                  }}
+                  aria-pressed={currency === code}
+                >
+                  {code === 'USD' ? '$ USD' : '₹ INR'}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="composer-amount-box">
-            <span className="composer-currency-prefix">$</span>
+            <span className="composer-currency-prefix">{currencySymbol}</span>
             <input
               id="deal-payment-input"
               type="text"
               inputMode="decimal"
               className="composer-amount-input"
-              placeholder="1500"
+              placeholder={currency === 'INR' ? '15000' : '1500'}
               value={paymentInput}
               onChange={(e) => {
                 setPaymentInput(e.target.value.replace(/[^0-9.]/g, ''));
