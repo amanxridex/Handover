@@ -532,9 +532,9 @@ export function getCachedProfileOverview(profileId, username) {
     ...raw,
     posts: Array.isArray(raw.posts)
       ? raw.posts.map((p) => ({
-          ...p,
-          time: p.createdAt ? formatRelativeTime(p.createdAt) : p.time,
-        }))
+        ...p,
+        time: p.createdAt ? formatRelativeTime(p.createdAt) : p.time,
+      }))
       : [],
   };
 }
@@ -605,16 +605,16 @@ export async function fetchUserProfileOverview(
 
         const followersPromise = hasId
           ? supabase
-              .from('follows')
-              .select('*', { count: 'exact', head: true })
-              .eq('following_id', profileId)
+            .from('follows')
+            .select('*', { count: 'exact', head: true })
+            .eq('following_id', profileId)
           : Promise.resolve({ count: 0 });
 
         const followingPromise = hasId
           ? supabase
-              .from('follows')
-              .select('*', { count: 'exact', head: true })
-              .eq('follower_id', profileId)
+            .from('follows')
+            .select('*', { count: 'exact', head: true })
+            .eq('follower_id', profileId)
           : Promise.resolve({ count: 0 });
 
         const [postsRes, followersRes, followingRes] = await Promise.all([
@@ -625,15 +625,15 @@ export async function fetchUserProfileOverview(
 
         const posts = Array.isArray(postsRes.data)
           ? postsRes.data.map((row) => ({
-              id: row.id,
-              title: row.headline,
-              image: row.image_url || '',
-              alt: row.headline,
-              tag: row.category || 'Post',
-              likesCount: row.likes_count || 0,
-              createdAt: row.created_at || null,
-              time: formatRelativeTime(row.created_at),
-            }))
+            id: row.id,
+            title: row.headline,
+            image: row.image_url || '',
+            alt: row.headline,
+            tag: row.category || 'Post',
+            likesCount: row.likes_count || 0,
+            createdAt: row.created_at || null,
+            time: formatRelativeTime(row.created_at),
+          }))
           : [];
 
         return {
@@ -654,9 +654,9 @@ export async function fetchUserProfileOverview(
     ...rawOverview,
     posts: Array.isArray(rawOverview.posts)
       ? rawOverview.posts.map((p) => ({
-          ...p,
-          time: p.createdAt ? formatRelativeTime(p.createdAt) : p.time,
-        }))
+        ...p,
+        time: p.createdAt ? formatRelativeTime(p.createdAt) : p.time,
+      }))
       : [],
   };
 }

@@ -99,6 +99,8 @@ export default function ChatScreen({
   const [storiesOpen, setStoriesOpen] = useState(true);
   const [draft, setDraft] = useState('');
   const [notice, setNotice] = useState('');
+  const [flyingIds, setFlyingIds] = useState(() => new Set());
+  const [isLaunching, setIsLaunching] = useState(false);
 
   const mergeServerWithLocalMessages = (localMsgs = [], serverMsgs = []) => {
     const serverIds = new Set(serverMsgs.map((m) => m.id));
@@ -253,6 +255,7 @@ export default function ChatScreen({
           from: 'them',
           text: payload.text,
           time: formatMessageTime(payload.createdAt),
+          isIncoming: true,
         };
         setChats((prev) =>
           prev.map((c) => {
@@ -342,7 +345,7 @@ export default function ChatScreen({
             ? {
                 ...c,
                 messages: c.messages.map((m) =>
-                  m.id === tempId ? res.message : m
+                  m.id === tempId ? { ...res.message, clientKey: tempId } : m
                 ),
               }
             : c
@@ -355,7 +358,9 @@ export default function ChatScreen({
             ? {
                 ...c,
                 messages: c.messages.map((m) =>
-                  m.id === tempId ? { ...m, pending: false, failed: true } : m
+                  m.id === tempId
+                    ? { ...m, pending: false, failed: true, clientKey: tempId }
+                    : m
                 ),
               }
             : c
@@ -375,6 +380,20 @@ export default function ChatScreen({
     const targetId = activeThread.id;
     setDraft('');
 
+    // Trigger launcher impulse and bubble flight from composer
+    setIsLaunching(true);
+    setFlyingIds((prev) => new Set(prev).add(tempId));
+    setTimeout(() => {
+      setIsLaunching(false);
+    }, 450);
+    setTimeout(() => {
+      setFlyingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(tempId);
+        return next;
+      });
+    }, 1100);
+
     setChats((prev) =>
       prev.map((c) =>
         c.id === targetId
@@ -386,11 +405,13 @@ export default function ChatScreen({
                 ...c.messages,
                 {
                   id: tempId,
+                  clientKey: tempId,
                   from: 'me',
                   text,
                   time: nowTime,
                   pending: true,
                   failed: false,
+                  isFlying: true,
                 },
               ],
             }
@@ -490,12 +511,18 @@ export default function ChatScreen({
             )}
             {activeThread.messages.map((msg) => {
               const isShort = msg.text.length <= 36 && !msg.text.includes('\n');
+              const isFlying =
+                Boolean(msg.isFlying) ||
+                flyingIds.has(msg.id) ||
+                Boolean(msg.clientKey && flyingIds.has(msg.clientKey));
               return (
                 <div
-                  key={msg.id}
+                  key={msg.clientKey || msg.id}
                   className={`chat-bubble ${msg.from === 'me' ? 'me' : 'them'} ${
                     isShort && !msg.failed ? 'inline' : 'stacked'
-                  } ${msg.failed ? 'is-failed' : ''}`}
+                  } ${msg.failed ? 'is-failed' : ''} ${
+                    isFlying ? 'is-flying' : ''
+                  } ${msg.isIncoming ? 'is-incoming' : ''}`}
                   onClick={msg.failed ? () => handleRetryMessage(msg) : undefined}
                 >
                   <span className="chat-bubble-text">{msg.text}</span>
@@ -521,10 +548,14 @@ export default function ChatScreen({
             />
             <button
               type="submit"
-              className={`chat-send-btn ${draft.trim() ? 'ready' : ''}`}
+              className={`chat-send-btn ${draft.trim() ? 'ready' : ''} ${
+                isLaunching ? 'is-launching' : ''
+              }`}
               aria-label="Send message"
             >
-              <PaperPlaneIcon />
+              <span className="chat-send-icon-wrap">
+                <PaperPlaneIcon />
+              </span>
             </button>
           </div>
         </form>
