@@ -1,6 +1,10 @@
 import avatarDefault from '../assets/avatar-default.jpg';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
-import { fetchRedisEndpoint, withSwrCache } from './clientCache';
+import {
+  fetchRedisEndpoint,
+  getCachedValue,
+  withSwrCache,
+} from './clientCache';
 
 export const FOUNDER_CATEGORIES = [
   'All',
@@ -45,6 +49,10 @@ function mapDbFounderRow(row) {
     instagram: row.instagram_handle || '',
     fromDb: true,
   };
+}
+
+export function getCachedFoundersDirectory() {
+  return getCachedValue('founders:directory');
 }
 
 export async function fetchFoundersDirectory({ force = false } = {}) {

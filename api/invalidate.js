@@ -1,9 +1,9 @@
 import { redisDeleteKeys } from './_lib/redisCache.js';
 
 const TAG_MAP = {
-  feed: 'handover:feed:posts:v1',
-  deals: 'handover:deals:active:v1',
-  founders: 'handover:founders:directory:v1',
+  feed: ['handover:feed:posts:v2', 'handover:feed:posts:v1'],
+  deals: ['handover:deals:active:v1'],
+  founders: ['handover:founders:directory:v2', 'handover:founders:directory:v1'],
 };
 
 export default async function handler(req, res) {
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
 
     for (const tag of tags) {
       if (TAG_MAP[tag]) {
-        keysToDelete.push(TAG_MAP[tag]);
+        keysToDelete.push(...TAG_MAP[tag]);
       } else if (typeof tag === 'string' && tag.startsWith('profile:')) {
         const suffix = tag.slice('profile:'.length).trim().toLowerCase();
         if (suffix) {

@@ -89,7 +89,14 @@ export default async function handler(req, res) {
           followingPromise,
         ]);
 
-        const posts = Array.isArray(postsRes.data) ? postsRes.data : [];
+        const rawPosts = Array.isArray(postsRes.data) ? postsRes.data : [];
+        const posts = rawPosts.map((row) => ({
+          ...row,
+          image_url:
+            row.image_url && row.image_url.length > 48000
+              ? `/api/avatar?id=${row.id}&kind=post`
+              : row.image_url || '',
+        }));
         return {
           posts,
           followersCount: followersRes.count || 0,

@@ -4,11 +4,17 @@ import {
   respondWithRedisCache,
 } from './_lib/redisCache.js';
 
-const FEED_CACHE_KEY = 'handover:feed:posts:v1';
+const FEED_CACHE_KEY = 'handover:feed:posts:v2';
+
+function compactImageRef(raw, fallbackUrl) {
+  if (!raw) return fallbackUrl || '';
+  if (raw.length > 48000 && fallbackUrl) return fallbackUrl;
+  return raw;
+}
 
 export default async function handler(req, res) {
   if (req.method === 'POST' || req.method === 'DELETE') {
-    await redisDeleteKeys(FEED_CACHE_KEY);
+    await redisDeleteKeys(FEED_CACHE_KEY, 'handover:feed:posts:v1');
     return res.status(200).json({ ok: true, invalidated: FEED_CACHE_KEY });
   }
 
@@ -46,10 +52,8 @@ export default async function handler(req, res) {
               id,
               full_name,
               username,
-              avatar_url,
               role,
-              company_name,
-              company_logo_url
+              company_name
             )
           `
           )
@@ -58,7 +62,24 @@ export default async function handler(req, res) {
           .limit(25);
 
         if (error || !Array.isArray(data)) return [];
-        return data;
+        return data.map((row) => {
+          const authorAvatarEndpoint = row.author_id
+            ? `/api/avatar?id=${row.author_id}&kind=avatar`
+            : '';
+          const authorLogoEndpoint = row.author_id
+            ? `/api/avatar?id=${row.author_id}&kind=logo`
+            : '';
+          return {
+            ...row,
+            image_url: compactImageRef(
+              row.image_url,
+              `/api/avatar?id=${row.id}&kind=post`
+            ),
+            author_avatar_url: authorAvatarEndpoint || compactImageRef(row.author_avatar_url, ''),
+            author_company_logo_url:
+              authorLogoEndpoint || compactImageRef(row.author_company_logo_url, ''),
+          };
+        });
       },
     });
   } catch (err) {

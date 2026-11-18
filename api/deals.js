@@ -36,7 +36,13 @@ export default async function handler(req, res) {
           .order('sort_order', { ascending: true });
 
         if (error || !Array.isArray(data)) return [];
-        return data;
+        return data.map((row) => ({
+          ...row,
+          brand_logo_url:
+            row.brand_logo_url && row.brand_logo_url.length > 48000
+              ? `/api/avatar?id=${row.id}&kind=deal`
+              : row.brand_logo_url,
+        }));
       },
     });
   } catch (err) {

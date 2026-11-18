@@ -350,11 +350,14 @@ export async function searchProfilesByName({
     .toLowerCase();
 
   try {
+    const isProd = Boolean(import.meta.env.PROD);
+    const selectCols = isProd
+      ? 'id, full_name, username, role, company_name, sector, company_pitch, bio, content_types'
+      : 'id, full_name, username, avatar_url, role, company_name, sector, company_pitch, bio, content_types';
+
     let req = supabase
       .from('profiles')
-      .select(
-        'id, full_name, username, avatar_url, role, company_name, sector, company_pitch, bio, content_types'
-      )
+      .select(selectCols)
       .eq('onboarding_completed', true)
       .or(
         `full_name.ilike.%${sanitized}%,username.ilike.%${sanitized}%,company_name.ilike.%${sanitized}%`
@@ -386,7 +389,9 @@ export async function searchProfilesByName({
         id: row.id,
         fullName: row.full_name || 'Handover Member',
         username: row.username || 'member',
-        avatar: row.avatar_url || '',
+        avatar: isProd
+          ? `/api/avatar?id=${row.id}&kind=avatar`
+          : row.avatar_url || '',
         role: row.role || 'creator',
         companyName: row.company_name || '',
         sector: row.sector || '',

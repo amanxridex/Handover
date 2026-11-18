@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   FOUNDER_CATEGORIES,
   fetchFoundersDirectory,
+  getCachedFoundersDirectory,
 } from '../services/foundersService';
 import { triggerLightHaptic } from '../utils/nativeBridge';
 import { SearchIcon } from './Icons';
@@ -40,8 +41,9 @@ export default function FoundersScreen({
   onOpenChat,
   onOpenProfile,
 }) {
-  const [founders, setFounders] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const initialFounders = getCachedFoundersDirectory();
+  const [founders, setFounders] = useState(initialFounders || []);
+  const [loading, setLoading] = useState(!initialFounders);
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [activeFounder, setActiveFounder] = useState(null);

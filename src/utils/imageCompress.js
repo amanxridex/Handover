@@ -45,8 +45,8 @@ export function compressImageFile(file, maxSize = 1440, quality = 0.92) {
         const srcH = img.naturalHeight || img.height;
         const maxDim = Math.max(srcW, srcH);
 
-        // Preserve original pixels untouched when already within target dimensions and lightweight
-        if (maxDim <= maxSize && file.size <= 550 * 1024) {
+        // Preserve original pixels only when already small and lightweight (<140 KB)
+        if (maxDim <= maxSize && file.size <= 140 * 1024) {
           resolve(dataUrl);
           return;
         }
@@ -55,8 +55,14 @@ export function compressImageFile(file, maxSize = 1440, quality = 0.92) {
         const w = Math.max(1, Math.round(srcW * scale));
         const h = Math.max(1, Math.round(srcH * scale));
         const canvas = stepDownSample(img, w, h);
-        const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-        resolve(canvas.toDataURL(mime, quality));
+
+        // Prefer WebP (supports transparency & shrinks 10x vs uncompressed PNG), fallback to JPEG
+        const webpData = canvas.toDataURL('image/webp', Math.min(quality, 0.86));
+        if (webpData.startsWith('data:image/webp')) {
+          resolve(webpData);
+          return;
+        }
+        resolve(canvas.toDataURL('image/jpeg', Math.min(quality, 0.86)));
       };
       img.src = dataUrl;
     };

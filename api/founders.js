@@ -4,11 +4,11 @@ import {
   respondWithRedisCache,
 } from './_lib/redisCache.js';
 
-const FOUNDERS_CACHE_KEY = 'handover:founders:directory:v1';
+const FOUNDERS_CACHE_KEY = 'handover:founders:directory:v2';
 
 export default async function handler(req, res) {
   if (req.method === 'POST' || req.method === 'DELETE') {
-    await redisDeleteKeys(FOUNDERS_CACHE_KEY);
+    await redisDeleteKeys(FOUNDERS_CACHE_KEY, 'handover:founders:directory:v1');
     return res.status(200).json({ ok: true, invalidated: FOUNDERS_CACHE_KEY });
   }
 
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
         const { data, error } = await supabase
           .from('profiles')
           .select(
-            'id, full_name, username, avatar_url, role, company_name, company_logo_url, company_pitch, sector, website_url, instagram_handle, created_at'
+            'id, full_name, username, role, company_name, company_pitch, sector, website_url, instagram_handle, created_at'
           )
           .eq('role', 'founder')
           .eq('onboarding_completed', true)
@@ -37,7 +37,11 @@ export default async function handler(req, res) {
           .limit(50);
 
         if (error || !Array.isArray(data)) return [];
-        return data;
+        return data.map((row) => ({
+          ...row,
+          avatar_url: `/api/avatar?id=${row.id}&kind=avatar`,
+          company_logo_url: `/api/avatar?id=${row.id}&kind=founder`,
+        }));
       },
     });
   } catch (err) {
