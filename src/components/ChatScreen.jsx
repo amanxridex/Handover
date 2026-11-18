@@ -3,6 +3,9 @@ import avatarDefault from '../assets/avatar-default.jpg';
 import {
   fetchDirectMessages,
   fetchMyDirectThreads,
+  formatMessageTime,
+  getCachedDirectMessages,
+  getCachedDirectThreads,
   isUuid,
   sendDirectMessage,
 } from '../services/chatService';
@@ -57,105 +60,154 @@ export default function ChatScreen({
   onOpenProfile,
 }) {
   const messagesEndRef = useRef(null);
-  const [chats, setChats] = useState([]);
-  const [loadingThreads, setLoadingThreads] = useState(true);
+  const initialCachedThreads = getCachedDirectThreads();
+  const [chats, setChats] = useState(() => {
+    const base = initialCachedThreads || [];
+    if (activeThreadId && isUuid(activeThreadId)) {
+      const cachedMsgs = getCachedDirectMessages(activeThreadId);
+      if (cachedMsgs) {
+        const exists = base.some((c) => c.id === activeThreadId);
+        if (exists) {
+          return base.map((c) =>
+            c.id === activeThreadId
+              ? { ...c, messages: cachedMsgs.messages || c.messages }
+              : c
+          );
+        }
+        if (cachedMsgs.peer) {
+          return [
+            {
+              ...cachedMsgs.peer,
+              avatar: cachedMsgs.peer.avatar || avatarDefault,
+              preview:
+                cachedMsgs.messages?.[cachedMsgs.messages.length - 1]?.text || '',
+              time:
+                cachedMsgs.messages?.[cachedMsgs.messages.length - 1]?.time ||
+                'New chat',
+              isDbThread: true,
+              messages: cachedMsgs.messages || [],
+            },
+            ...base,
+          ];
+        }
+      }
+    }
+    return base;
+  });
+  const [loadingThreads, setLoadingThreads] = useState(!initialCachedThreads);
   const [query, setQuery] = useState('');
   const [storiesOpen, setStoriesOpen] = useState(true);
   const [draft, setDraft] = useState('');
   const [notice, setNotice] = useState('');
 
-  const refreshThreads = useCallback(async () => {
-    const dbThreads = await fetchMyDirectThreads();
-    setLoadingThreads(false);
-    if (!Array.isArray(dbThreads)) return;
+  const mergeServerWithLocalMessages = (localMsgs = [], serverMsgs = []) => {
+    const serverIds = new Set(serverMsgs.map((m) => m.id));
+    const unresolvedLocal = (localMsgs || []).filter(
+      (m) => (m.pending || m.failed) && !serverIds.has(m.id)
+    );
+    return unresolvedLocal.length > 0
+      ? [...serverMsgs, ...unresolvedLocal]
+      : serverMsgs;
+  };
 
-    setChats((prev) => {
-      const prevById = new Map(prev.map((p) => [p.id, p]));
-      const dbIds = new Set(dbThreads.map((t) => t.id));
-      const normalizedDb = dbThreads.map((t) => {
-        const existing = prevById.get(t.id);
-        return {
-          ...t,
-          avatar: t.avatar || avatarDefault,
-          messages: existing?.messages || [],
-        };
+  const refreshThreads = useCallback(
+    async ({ force = false } = {}) => {
+      const dbThreads = await fetchMyDirectThreads({ force });
+      setLoadingThreads(false);
+      if (!Array.isArray(dbThreads)) return;
+
+      setChats((prev) => {
+        const prevById = new Map(prev.map((p) => [p.id, p]));
+        const dbIds = new Set(dbThreads.map((t) => t.id));
+        const normalizedDb = dbThreads.map((t) => {
+          const existing = prevById.get(t.id);
+          return {
+            ...t,
+            avatar: t.avatar || avatarDefault,
+            messages: existing?.messages || [],
+          };
+        });
+
+        // Keep unsent activePeer at top if user just navigated via "Message" button
+        const unsentPeer =
+          activePeer?.id && !dbIds.has(activePeer.id)
+            ? prevById.get(activePeer.id) || {
+                id: activePeer.id,
+                shortName:
+                  (activePeer.fullName || activePeer.name || 'Member').split(' ')[0],
+                name: activePeer.fullName || activePeer.name || 'Handover Member',
+                username: activePeer.username || '',
+                time: 'New chat',
+                avatar: activePeer.avatar || avatarDefault,
+                preview: 'Start a conversation',
+                isDbThread: true,
+                messages: [],
+              }
+            : null;
+
+        return unsentPeer ? [unsentPeer, ...normalizedDb] : normalizedDb;
       });
+    },
+    [activePeer]
+  );
 
-      // Keep unsent activePeer at top if user just navigated via "Message" button
-      const unsentPeer =
-        activePeer?.id && !dbIds.has(activePeer.id)
-          ? prevById.get(activePeer.id) || {
-              id: activePeer.id,
-              shortName:
-                (activePeer.fullName || activePeer.name || 'Member').split(' ')[0],
-              name: activePeer.fullName || activePeer.name || 'Handover Member',
-              username: activePeer.username || '',
-              time: 'New chat',
-              avatar: activePeer.avatar || avatarDefault,
-              preview: 'Start a conversation',
+  const loadActiveMessages = useCallback(
+    async ({ force = false } = {}) => {
+      if (!activeThreadId || !isUuid(activeThreadId)) return;
+      const res = await fetchDirectMessages(activeThreadId, { force });
+      if (!res) return;
+
+      setChats((prev) => {
+        const exists = prev.some((c) => c.id === activeThreadId);
+        const peerName =
+          res.peer?.name ||
+          activePeer?.fullName ||
+          activePeer?.name ||
+          'Handover Member';
+        const lastMsg =
+          res.messages.length > 0
+            ? res.messages[res.messages.length - 1]
+            : null;
+
+        if (!exists) {
+          return [
+            {
+              id: activeThreadId,
+              shortName: peerName.split(' ')[0] || peerName,
+              name: peerName,
+              username: res.peer?.username || activePeer?.username || '',
+              avatar: res.peer?.avatar || activePeer?.avatar || avatarDefault,
+              time: lastMsg?.time || 'New chat',
+              preview: lastMsg?.text || 'Start a conversation',
               isDbThread: true,
-              messages: [],
-            }
-          : null;
-
-      return unsentPeer ? [unsentPeer, ...normalizedDb] : normalizedDb;
-    });
-  }, [activePeer]);
-
-  const loadActiveMessages = useCallback(async () => {
-    if (!activeThreadId || !isUuid(activeThreadId)) return;
-    const res = await fetchDirectMessages(activeThreadId);
-    if (!res) return;
-
-    setChats((prev) => {
-      const exists = prev.some((c) => c.id === activeThreadId);
-      const peerName =
-        res.peer?.name ||
-        activePeer?.fullName ||
-        activePeer?.name ||
-        'Handover Member';
-      const lastMsg =
-        res.messages.length > 0
-          ? res.messages[res.messages.length - 1]
-          : null;
-
-      if (!exists) {
-        return [
-          {
-            id: activeThreadId,
-            shortName: peerName.split(' ')[0] || peerName,
-            name: peerName,
-            username: res.peer?.username || activePeer?.username || '',
-            avatar: res.peer?.avatar || activePeer?.avatar || avatarDefault,
-            time: lastMsg?.time || 'New chat',
-            preview: lastMsg?.text || 'Start a conversation',
-            isDbThread: true,
-            messages: res.messages,
-          },
-          ...prev,
-        ];
-      }
-
-      return prev.map((c) =>
-        c.id === activeThreadId
-          ? {
-              ...c,
-              name: res.peer?.name || c.name,
-              shortName: res.peer?.shortName || c.shortName,
-              username: res.peer?.username || c.username || '',
-              avatar: res.peer?.avatar || c.avatar || avatarDefault,
-              preview: lastMsg?.text || c.preview,
-              time: lastMsg?.time || c.time,
               messages: res.messages,
-            }
-          : c
-      );
-    });
-  }, [activeThreadId, activePeer]);
+            },
+            ...prev,
+          ];
+        }
+
+        return prev.map((c) =>
+          c.id === activeThreadId
+            ? {
+                ...c,
+                name: res.peer?.name || c.name,
+                shortName: res.peer?.shortName || c.shortName,
+                username: res.peer?.username || c.username || '',
+                avatar: res.peer?.avatar || c.avatar || avatarDefault,
+                preview: lastMsg?.text || c.preview,
+                time: lastMsg?.time || c.time,
+                messages: mergeServerWithLocalMessages(c.messages, res.messages),
+              }
+            : c
+        );
+      });
+    },
+    [activeThreadId, activePeer]
+  );
 
   // Initial load + DB sync when user switches or peer opens
   useEffect(() => {
-    refreshThreads();
+    refreshThreads({ force: false });
   }, [currentUserId, refreshThreads]);
 
   // Ensure an activePeer tapped from Search/Profile exists in thread list even before 1st message
@@ -183,24 +235,55 @@ export default function ChatScreen({
     });
   }, [activeThreadId, activePeer]);
 
-  // Load live messages for open thread + subscribe to real-time broadcasts + backup poll
+  // Load live messages for open thread + subscribe to real-time broadcasts + calm backup poll
   useEffect(() => {
-    loadActiveMessages();
+    loadActiveMessages({ force: false });
   }, [loadActiveMessages]);
 
   useEffect(() => {
-    const syncAll = () => {
-      refreshThreads();
+    const syncForced = (payload) => {
+      if (
+        payload?.id &&
+        payload?.senderId &&
+        payload.senderId !== currentUserId &&
+        payload.text
+      ) {
+        const incomingMsg = {
+          id: payload.id,
+          from: 'them',
+          text: payload.text,
+          time: formatMessageTime(payload.createdAt),
+        };
+        setChats((prev) =>
+          prev.map((c) => {
+            if (c.id !== payload.senderId) return c;
+            if (c.messages.some((m) => m.id === payload.id)) return c;
+            return {
+              ...c,
+              time: 'Just Now',
+              preview: payload.text,
+              messages: [...c.messages, incomingMsg],
+            };
+          })
+        );
+      }
+
+      refreshThreads({ force: true });
       if (activeThreadId && isUuid(activeThreadId)) {
-        loadActiveMessages();
+        loadActiveMessages({ force: true });
       }
     };
 
     const unsubscribe = currentUserId
-      ? subscribeRealtimeChannel(`dm:${currentUserId}`, 'new_dm', syncAll)
+      ? subscribeRealtimeChannel(`dm:${currentUserId}`, 'new_dm', syncForced)
       : () => {};
 
-    const timer = setInterval(syncAll, 3500);
+    const timer = setInterval(() => {
+      refreshThreads({ force: true });
+      if (activeThreadId && isUuid(activeThreadId)) {
+        loadActiveMessages({ force: true });
+      }
+    }, 8000);
     return () => {
       unsubscribe();
       clearInterval(timer);
@@ -249,50 +332,92 @@ export default function ChatScreen({
     setTimeout(() => setNotice(''), 1800);
   };
 
+  const deliverMessage = async (threadId, tempId, text) => {
+    if (!isUuid(threadId)) return;
+    const res = await sendDirectMessage(threadId, text);
+    if (res.ok && res.message) {
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === threadId
+            ? {
+                ...c,
+                messages: c.messages.map((m) =>
+                  m.id === tempId ? res.message : m
+                ),
+              }
+            : c
+        )
+      );
+    } else {
+      setChats((prev) =>
+        prev.map((c) =>
+          c.id === threadId
+            ? {
+                ...c,
+                messages: c.messages.map((m) =>
+                  m.id === tempId ? { ...m, pending: false, failed: true } : m
+                ),
+              }
+            : c
+        )
+      );
+      showToast(res.error || 'Could not send message · Tap to retry');
+    }
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     const text = draft.trim();
     if (!text || !activeThread) return;
     triggerLightHaptic();
     const nowTime = formatCurrentTime();
-    const tempId = `me-${Date.now()}`;
+    const tempId = `me-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const targetId = activeThread.id;
     setDraft('');
 
     setChats((prev) =>
       prev.map((c) =>
-        c.id === activeThread.id
+        c.id === targetId
           ? {
               ...c,
               time: 'Just Now',
               preview: text,
               messages: [
                 ...c.messages,
-                { id: tempId, from: 'me', text, time: nowTime },
+                {
+                  id: tempId,
+                  from: 'me',
+                  text,
+                  time: nowTime,
+                  pending: true,
+                  failed: false,
+                },
               ],
             }
           : c
       )
     );
 
-    if (isUuid(activeThread.id)) {
-      const res = await sendDirectMessage(activeThread.id, text);
-      if (res.ok && res.message) {
-        setChats((prev) =>
-          prev.map((c) =>
-            c.id === activeThread.id
-              ? {
-                  ...c,
-                  messages: c.messages.map((m) =>
-                    m.id === tempId ? res.message : m
-                  ),
-                }
-              : c
-          )
-        );
-      } else {
-        showToast(res.error || 'Could not send message');
-      }
-    }
+    await deliverMessage(targetId, tempId, text);
+  };
+
+  const handleRetryMessage = async (msg) => {
+    if (!activeThread || !msg?.failed) return;
+    triggerLightHaptic();
+    const targetId = activeThread.id;
+    setChats((prev) =>
+      prev.map((c) =>
+        c.id === targetId
+          ? {
+              ...c,
+              messages: c.messages.map((m) =>
+                m.id === msg.id ? { ...m, pending: true, failed: false } : m
+              ),
+            }
+          : c
+      )
+    );
+    await deliverMessage(targetId, msg.id, msg.text);
   };
 
   if (activeThread) {
@@ -368,11 +493,15 @@ export default function ChatScreen({
               return (
                 <div
                   key={msg.id}
-                  className={`chat-bubble ${msg.from === 'me' ? 'me' : 'them'} ${isShort ? 'inline' : 'stacked'
-                    }`}
+                  className={`chat-bubble ${msg.from === 'me' ? 'me' : 'them'} ${
+                    isShort && !msg.failed ? 'inline' : 'stacked'
+                  } ${msg.failed ? 'is-failed' : ''}`}
+                  onClick={msg.failed ? () => handleRetryMessage(msg) : undefined}
                 >
                   <span className="chat-bubble-text">{msg.text}</span>
-                  <span className="chat-bubble-time">{msg.time}</span>
+                  <span className="chat-bubble-time">
+                    {msg.failed ? 'Not sent · Tap to retry' : msg.time}
+                  </span>
                 </div>
               );
             })}

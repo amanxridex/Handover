@@ -3,6 +3,7 @@ import { sendPriorityPushToRecipient } from './nativeNotifySender';
 import { getStoredOnboardingState, getStoredSessionToken } from './profileService';
 import {
   broadcastRealtimeEvent,
+  sanitizeRealtimeAvatar,
   subscribeRealtimeChannel,
 } from './realtimeService';
 
@@ -52,10 +53,13 @@ export async function fetchMyNotifications() {
       actorId: row.actorId || '',
       actor: row.actor || 'Handover Member',
       actorUsername: row.actorUsername || '',
-      avatar: row.avatar || '',
+      avatar: sanitizeRealtimeAvatar(row.avatar || '', row.actorId || ''),
       postId: row.postId || null,
       postTitle: row.postTitle || '',
-      postThumb: row.postThumb || '',
+      postThumb:
+        row.postThumb && row.postThumb.length > 16000 && row.postId && import.meta.env.PROD
+          ? `/api/avatar?id=${row.postId}&kind=post`
+          : row.postThumb || '',
       comment: row.comment || '',
       unread: Boolean(row.unread),
       followingBack: Boolean(row.followingBack),
@@ -130,7 +134,10 @@ export async function createActivityNotification({
       const actorId = me?.id || me?.profileId || '';
       const actorName =
         me?.setupData?.name || me?.setupData?.username || 'Someone';
-      const actorAvatar = me?.setupData?.avatar || '';
+      const safeAvatar = sanitizeRealtimeAvatar(
+        me?.setupData?.avatar || '',
+        actorId
+      );
 
       broadcastRealtimeEvent(`notif:${data.recipientId}`, 'new_notification', {
         type,
@@ -138,7 +145,7 @@ export async function createActivityNotification({
         commentText,
         actorId,
         actorName,
-        actorAvatar,
+        actorAvatar: safeAvatar,
       });
 
       const bodyText =
@@ -157,7 +164,7 @@ export async function createActivityNotification({
         body: bodyText,
         url: '/notifications',
         tag: `${type}-${postId || actorId || data.recipientId}`,
-        icon: actorAvatar,
+        icon: safeAvatar,
       });
     }
 

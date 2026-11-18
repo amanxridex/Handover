@@ -409,14 +409,14 @@ export default function App() {
     setNotifications(rows);
   }, [profileId, dispatchIncomingAlert]);
 
-  const refreshGlobalIncomingDms = useCallback(async () => {
+  const refreshGlobalIncomingDms = useCallback(async ({ force = false } = {}) => {
     if (!profileId) {
       seenDmIdsRef.current = new Set();
       dmHydratedRef.current = false;
       return;
     }
 
-    const threads = await fetchMyDirectThreads();
+    const threads = await fetchMyDirectThreads({ force });
     if (!Array.isArray(threads)) return;
 
     if (!dmHydratedRef.current) {
@@ -491,14 +491,14 @@ export default function App() {
             tag: `dm-${payload.senderId}`,
           });
         }
-        refreshGlobalIncomingDms();
+        refreshGlobalIncomingDms({ force: true });
       }
     );
 
     const timer = setInterval(() => {
       refreshNotifications();
-      refreshGlobalIncomingDms();
-    }, 4500);
+      refreshGlobalIncomingDms({ force: true });
+    }, 9000);
 
     return () => {
       unsubNotif();

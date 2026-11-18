@@ -4,6 +4,20 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase';
 // can listen to the same channel topic without removing each other's socket.
 const channelRegistry = new Map();
 
+export function sanitizeRealtimeAvatar(avatar, profileId = '') {
+  const val = String(avatar || '');
+  if (val.startsWith('/api/avatar') || /^https?:\/\//i.test(val)) {
+    return val;
+  }
+  if (val && val.length <= 2048) {
+    return val;
+  }
+  if (profileId && import.meta.env.PROD) {
+    return `/api/avatar?id=${profileId}&kind=avatar`;
+  }
+  return '';
+}
+
 function ensureSubscribedChannel(channelName) {
   let entry = channelRegistry.get(channelName);
   if (entry) return entry;

@@ -9017,3 +9017,14 @@ button,
   border-color: #cbd5e1;
   color: #0f172a;
 }
+
+.chat-bubble.is-failed {
+  border: 1px solid rgba(254, 202, 202, 0.8);
+  background: #991b1b;
+  cursor: pointer;
+}
+
+.chat-bubble.is-failed .chat-bubble-time {
+  color: #fecaca;
+  font-weight: 700;
+}

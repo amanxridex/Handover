@@ -5,7 +5,10 @@ import {
   withSwrCache,
 } from './clientCache';
 import { sendPriorityPushToRecipient } from './nativeNotifySender';
-import { broadcastRealtimeEvent } from './realtimeService';
+import {
+  broadcastRealtimeEvent,
+  sanitizeRealtimeAvatar,
+} from './realtimeService';
 
 const STORAGE_KEY = 'handover_profile_v1';
 const SESSION_TOKEN_KEY = 'handover_session_token_v1';
@@ -491,13 +494,16 @@ export async function toggleFollowProfile(targetProfileId) {
     if (Boolean(data.following)) {
       const actorName =
         me?.setupData?.name || me?.setupData?.username || 'Someone';
-      const actorAvatar = me?.setupData?.avatar || '';
+      const safeAvatar = sanitizeRealtimeAvatar(
+        me?.setupData?.avatar || '',
+        actorId
+      );
 
       broadcastRealtimeEvent(`notif:${targetProfileId}`, 'new_notification', {
         type: 'follow',
         actorId,
         actorName,
-        actorAvatar,
+        actorAvatar: safeAvatar,
       });
 
       sendPriorityPushToRecipient({
@@ -507,7 +513,7 @@ export async function toggleFollowProfile(targetProfileId) {
         body: 'started following you',
         url: '/notifications',
         tag: `follow-${actorId || targetProfileId}`,
-        icon: actorAvatar,
+        icon: safeAvatar,
       });
     }
     return {
