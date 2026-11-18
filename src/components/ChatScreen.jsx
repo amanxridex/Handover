@@ -10,6 +10,7 @@ import {
   sendDirectMessage,
 } from '../services/chatService';
 import { subscribeRealtimeChannel } from '../services/realtimeService';
+import { playNotificationSound } from '../services/soundService';
 import { triggerLightHaptic } from '../utils/nativeBridge';
 import BottomNav from './BottomNav';
 import {
@@ -250,6 +251,7 @@ export default function ChatScreen({
         payload.senderId !== currentUserId &&
         payload.text
       ) {
+        playNotificationSound({ type: 'message' });
         const incomingMsg = {
           id: payload.id,
           from: 'them',

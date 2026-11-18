@@ -68,6 +68,7 @@ import {
   getStoredSettings,
   saveUserSettings,
 } from './services/settingsService';
+import { playNotificationSound } from './services/soundService';
 import { triggerLightHaptic } from './utils/nativeBridge';
 
 const TABS = [
@@ -362,6 +363,9 @@ export default function App() {
       }
 
       triggerLightHaptic();
+      playNotificationSound({
+        type: alert.kind === 'message' ? 'message' : 'notification',
+      });
       setLiveAlert(alert);
       if (liveAlertTimerRef.current) clearTimeout(liveAlertTimerRef.current);
       liveAlertTimerRef.current = setTimeout(() => {
@@ -460,7 +464,23 @@ export default function App() {
     const unsubNotif = subscribeRealtimeChannel(
       `notif:${profileId}`,
       'new_notification',
-      () => {
+      (payload) => {
+        if (payload?.type && (payload?.actorName || payload?.actorId)) {
+          const rtTag = `rt-${payload.type}-${payload.postId || payload.actorId || Date.now()}`;
+          if (!seenNotifIdsRef.current.has(rtTag)) {
+            seenNotifIdsRef.current.add(rtTag);
+            dispatchIncomingAlert(
+              buildActivityAlert({
+                id: rtTag,
+                type: payload.type,
+                actor: payload.actorName || 'Handover Member',
+                avatar: payload.actorAvatar || '',
+                comment: payload.commentText || '',
+                postId: payload.postId || null,
+              })
+            );
+          }
+        }
         refreshNotifications();
       }
     );
@@ -533,6 +553,9 @@ export default function App() {
     const onSwMessage = (event) => {
       if (event.data?.type === 'NAVIGATE_TO' && event.data?.url) {
         navigateFromNotification(event.data.url);
+      }
+      if (event.data?.type === 'PLAY_SOUND') {
+        playNotificationSound({ type: event.data.sound || 'notification' });
       }
     };
     navigator.serviceWorker.addEventListener('message', onSwMessage);

@@ -16,6 +16,7 @@ import {
   triggerMediumHaptic,
   triggerSuccessHaptic,
 } from '../utils/nativeBridge';
+import { playNotificationSound } from '../services/soundService';
 import { BackTriangleIcon, SearchIcon } from './Icons';
 import PasscodeLockScreen from './PasscodeLockScreen';
 
@@ -127,6 +128,14 @@ function SettingIcon({ name }) {
             strokeLinecap="round"
             strokeLinejoin="round"
           />
+        </svg>
+      );
+    case 'sound':
+      return (
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" stroke={stroke} strokeWidth="1.8" strokeLinejoin="round" />
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       );
     case 'lock':
@@ -313,6 +322,17 @@ export default function SettingsScreen({
       showToast('Haptic feedback enabled');
     } else {
       showToast('Haptic feedback muted');
+    }
+  };
+
+  const handleSoundToggle = async (nextVal) => {
+    await onUpdateSettings({ soundEnabled: nextVal });
+    if (nextVal) {
+      triggerLightHaptic();
+      playNotificationSound({ type: 'notification', force: true });
+      showToast('Notification sounds enabled');
+    } else {
+      showToast('Notification sounds muted');
     }
   };
 
@@ -604,6 +624,23 @@ export default function SettingsScreen({
                 checked={settings.hapticsEnabled}
                 onChange={handleHapticsToggle}
                 label="Toggle haptic feedback"
+              />
+            </div>
+          )}
+
+          {matchesQuery('sound audio chime notification sound') && (
+            <div
+              className="settings-row"
+              onClick={() => handleSoundToggle(settings.soundEnabled === false ? true : false)}
+            >
+              <span className="settings-row-icon">
+                <SettingIcon name="sound" />
+              </span>
+              <span className="settings-row-label">Notification Sound</span>
+              <ToggleSwitch
+                checked={settings.soundEnabled !== false}
+                onChange={handleSoundToggle}
+                label="Toggle notification sound"
               />
             </div>
           )}

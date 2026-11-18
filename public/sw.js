@@ -5,6 +5,8 @@ const PRECACHE_ASSETS = [
   '/icon-512.png',
   '/apple-touch-icon.png',
   '/favicon-32.png',
+  '/notification.wav',
+  '/message.wav',
 ];
 
 self.addEventListener('install', (event) => {
@@ -37,6 +39,17 @@ self.addEventListener('message', (event) => {
       p.icon && !(String(p.icon).startsWith('data:') && String(p.icon).length > 8192)
         ? p.icon
         : '/icon-192.png';
+    const soundType = p.kind === 'message' ? 'message' : 'notification';
+
+    self.clients
+      .matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          client.postMessage({ type: 'PLAY_SOUND', sound: soundType });
+        }
+      })
+      .catch(() => {});
+
     event.waitUntil(
       self.registration.showNotification(p.title || 'Handover', {
         body: p.body || 'New activity on Handover',
@@ -74,6 +87,16 @@ self.addEventListener('push', (event) => {
     vibrate: [120, 60, 120],
     data: { url: payload.url || '/notifications' },
   };
+
+  const soundType = payload.kind === 'message' ? 'message' : 'notification';
+  self.clients
+    .matchAll({ type: 'window', includeUncontrolled: true })
+    .then((clientList) => {
+      for (const client of clientList) {
+        client.postMessage({ type: 'PLAY_SOUND', sound: soundType });
+      }
+    })
+    .catch(() => {});
 
   event.waitUntil(self.registration.showNotification(title, options));
 });

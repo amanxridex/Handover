@@ -7,6 +7,7 @@ const SETTINGS_STORAGE_KEY = 'handover_settings_v1';
 export const DEFAULT_SETTINGS = {
   planTier: 'free', // free | pro | founder_pro
   hapticsEnabled: true,
+  soundEnabled: true,
   biometricLockEnabled: false,
   hasPasscode: false,
   passcodeHash: '',
