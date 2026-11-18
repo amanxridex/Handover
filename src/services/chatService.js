@@ -195,6 +195,30 @@ export async function fetchDirectMessages(peerId, { force = false } = {}) {
 }
 
 async function attemptSendMessage(token, recipientId, cleanText) {
+  // Direct PostgreSQL RPC over active Supabase connection (fastest path)
+  try {
+    const { data, error } = await supabase.rpc('send_direct_message', {
+      p_session_token: token,
+      p_recipient_id: recipientId,
+      p_body: cleanText,
+    });
+
+    if (!error && data?.ok && data?.message) {
+      return { ok: true, message: data.message };
+    }
+
+    if (data?.error === 'UNAUTHORIZED' || data?.error === 'INVALID_MESSAGE') {
+      return {
+        ok: false,
+        fatal: true,
+        error: data.error,
+      };
+    }
+  } catch {
+    // Fall back to serverless API route if direct RPC encounters network transport fault
+  }
+
+  // Fallback to serverless API endpoint
   if (import.meta.env.PROD && typeof window !== 'undefined') {
     try {
       const res = await fetch('/api/chat', {
@@ -220,25 +244,15 @@ async function attemptSendMessage(token, recipientId, cleanText) {
         };
       }
     } catch {
-      // Fallback cleanly to direct RPC
+      // Both routes failed
     }
   }
 
-  const { data, error } = await supabase.rpc('send_direct_message', {
-    p_session_token: token,
-    p_recipient_id: recipientId,
-    p_body: cleanText,
-  });
-
-  if (error || !data?.ok || !data?.message) {
-    return {
-      ok: false,
-      fatal: data?.error === 'UNAUTHORIZED' || data?.error === 'INVALID_MESSAGE',
-      error: data?.error || error?.message || 'Failed to send message.',
-    };
-  }
-
-  return { ok: true, message: data.message };
+  return {
+    ok: false,
+    fatal: false,
+    error: 'Could not send message. Tap to retry.',
+  };
 }
 
 export async function sendDirectMessage(recipientId, text) {
@@ -254,10 +268,32 @@ export async function sendDirectMessage(recipientId, text) {
     return { ok: false, error: 'Unable to send message right now.' };
   }
 
+  const actor = getStoredOnboardingState();
+  const senderId = actor?.id || actor?.profileId || '';
+  const senderName =
+    actor?.setupData?.name || actor?.setupData?.username || 'New Message';
+  const safeRealtimeAvatar = sanitizeRealtimeAvatar(
+    actor?.setupData?.avatar || '',
+    senderId
+  );
+  const optimisticId = `dm-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const nowIso = new Date().toISOString();
+
+  // 1. INSTANT PARALLEL REALTIME BROADCAST:
+  // Dispatches to recipient within ~10ms without waiting for DB roundtrip
+  broadcastRealtimeEvent(`dm:${recipientId}`, 'new_dm', {
+    id: optimisticId,
+    senderId,
+    senderName,
+    senderAvatar: safeRealtimeAvatar,
+    text: cleanText,
+    createdAt: nowIso,
+  });
+
   try {
     let result = await attemptSendMessage(token, recipientId, cleanText);
     if (!result.ok && !result.fatal) {
-      await new Promise((resolve) => setTimeout(resolve, 350));
+      await new Promise((resolve) => setTimeout(resolve, 200));
       result = await attemptSendMessage(token, recipientId, cleanText);
     }
 
@@ -272,31 +308,27 @@ export async function sendDirectMessage(recipientId, text) {
       id: result.message.id,
       from: 'me',
       text: result.message.text,
-      createdAt: result.message.createdAt || new Date().toISOString(),
-      time: formatMessageTime(result.message.createdAt),
+      createdAt: result.message.createdAt || nowIso,
+      time: formatMessageTime(result.message.createdAt || nowIso),
     };
 
+    // If confirmed ID is different from optimistic broadcast, send confirmed ID sync
+    if (savedMsg.id !== optimisticId) {
+      broadcastRealtimeEvent(`dm:${recipientId}`, 'new_dm', {
+        id: savedMsg.id,
+        senderId,
+        senderName,
+        senderAvatar: safeRealtimeAvatar,
+        text: savedMsg.text,
+        createdAt: savedMsg.createdAt,
+      });
+    }
+
+    // Invalidate local and server caches asynchronously
     invalidateCachePrefix(`chat:thread:${recipientId}`);
     invalidateCachePrefix('chat:threads');
 
-    const actor = getStoredOnboardingState();
-    const senderId = actor?.id || actor?.profileId || '';
-    const senderName =
-      actor?.setupData?.name || actor?.setupData?.username || 'New Message';
-    const safeRealtimeAvatar = sanitizeRealtimeAvatar(
-      actor?.setupData?.avatar || '',
-      senderId
-    );
-
-    broadcastRealtimeEvent(`dm:${recipientId}`, 'new_dm', {
-      id: savedMsg.id,
-      senderId,
-      senderName,
-      senderAvatar: safeRealtimeAvatar,
-      text: savedMsg.text,
-      createdAt: result.message.createdAt,
-    });
-
+    // Trigger push notification to recipient's phone / background service worker
     sendPriorityPushToRecipient({
       recipientId,
       kind: 'dm',

@@ -77,10 +77,18 @@ export function LiveNotificationBanner({
 }) {
   if (!alert) return null;
 
+  const messages =
+    Array.isArray(alert.messages) && alert.messages.length > 0
+      ? alert.messages
+      : [alert.body].filter(Boolean);
+  const count = alert.count || messages.length;
+  const isMulti = messages.length > 1;
+
   return (
     <div className="live-notif-banner-wrap" role="status" aria-live="polite">
       <div
-        className="live-notif-banner"
+        key={alert.bumpKey || alert.id || alert.tag}
+        className={`live-notif-banner ${isMulti ? 'is-stacked' : ''}`}
         role="button"
         tabIndex={0}
         onClick={() => onTap?.(alert)}
@@ -91,20 +99,48 @@ export function LiveNotificationBanner({
           }
         }}
       >
-        <img
-          src={alert.avatar || avatarDefault}
-          alt={alert.title}
-          className="live-notif-avatar"
-        />
+        <div className="live-notif-avatar-wrap">
+          <img
+            src={alert.avatar || avatarDefault}
+            alt={alert.title}
+            className="live-notif-avatar"
+          />
+          {count > 1 && (
+            <span
+              className="live-notif-badge-bubble"
+              aria-label={`${count} messages`}
+            >
+              {count}
+            </span>
+          )}
+        </div>
+
         <div className="live-notif-copy">
           <div className="live-notif-top-row">
             <span className="live-notif-title">{alert.title}</span>
             <span className={`live-notif-pill is-${alert.kind || 'info'}`}>
-              {alert.label || 'Alert'}
+              {count > 1 ? `${count} new messages` : alert.label || 'Message'}
             </span>
           </div>
-          <p className="live-notif-body">{alert.body}</p>
+
+          <div className="live-notif-messages-list">
+            {messages.slice(-3).map((text, idx, arr) => {
+              const isLatest = idx === arr.length - 1;
+              return (
+                <div
+                  key={`${idx}-${text}`}
+                  className={`live-notif-msg-item ${
+                    isLatest ? 'is-latest' : 'is-prev'
+                  }`}
+                >
+                  {isMulti && <span className="live-notif-msg-bullet">•</span>}
+                  <span className="live-notif-msg-text">{text}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
+
         <button
           type="button"
           className="live-notif-close"

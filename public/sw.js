@@ -77,18 +77,9 @@ self.addEventListener('push', (event) => {
     !(String(payload.icon).startsWith('data:') && String(payload.icon).length > 8192)
       ? payload.icon
       : '/icon-192.png';
-  const title = payload.title || 'Handover';
-  const options = {
-    body: payload.body || 'You have new activity',
-    icon: safeIcon,
-    badge: '/icon-192.png',
-    tag: payload.tag || `handover-push-${Date.now()}`,
-    renotify: true,
-    vibrate: [120, 60, 120],
-    data: { url: payload.url || '/notifications' },
-  };
-
+  const targetTag = payload.tag || `handover-push-${Date.now()}`;
   const soundType = payload.kind === 'message' ? 'message' : 'notification';
+
   self.clients
     .matchAll({ type: 'window', includeUncontrolled: true })
     .then((clientList) => {
@@ -98,7 +89,47 @@ self.addEventListener('push', (event) => {
     })
     .catch(() => {});
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    (async () => {
+      let title = payload.title || 'Handover';
+      let body = payload.body || 'You have new activity';
+      let messages = [payload.body].filter(Boolean);
+
+      try {
+        const existing = await self.registration.getNotifications({
+          tag: targetTag,
+        });
+        if (existing && existing.length > 0) {
+          const prev = existing[0];
+          const prevMessages = Array.isArray(prev.data?.messages)
+            ? prev.data.messages
+            : [prev.body].filter(Boolean);
+
+          messages = [...prevMessages, payload.body].filter(Boolean);
+          const count = messages.length;
+          title = `${payload.title || 'Handover'} (${count} messages)`;
+          body = messages.slice(-3).map((m) => `• ${m}`).join('\n');
+        }
+      } catch {
+        // Fallback to plain notification
+      }
+
+      const options = {
+        body,
+        icon: safeIcon,
+        badge: '/icon-192.png',
+        tag: targetTag,
+        renotify: true,
+        vibrate: [120, 60, 120],
+        data: {
+          url: payload.url || '/notifications',
+          messages,
+        },
+      };
+
+      return self.registration.showNotification(title, options);
+    })()
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {

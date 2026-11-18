@@ -8625,6 +8625,113 @@ button,
   border: 1px solid rgba(255, 255, 255, 0.24);
 }
 
+.live-notif-avatar-wrap {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.live-notif-badge-bubble {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  background: #f97316;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #0a2468;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  animation: liveBadgePop 0.22s cubic-bezier(0.18, 0.89, 0.32, 1.2) both;
+}
+
+@keyframes liveBadgePop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.live-notif-banner.is-stacked {
+  animation: liveNotifBump 0.28s cubic-bezier(0.18, 0.89, 0.32, 1.15) both;
+  border-color: rgba(249, 115, 22, 0.55);
+  box-shadow: 0 16px 36px rgba(249, 115, 22, 0.22), 0 8px 24px rgba(2, 6, 23, 0.5);
+}
+
+@keyframes liveNotifBump {
+  0% {
+    transform: scale(0.96) translate3d(0, -2px, 0);
+  }
+  50% {
+    transform: scale(1.02) translate3d(0, 1px, 0);
+  }
+  100% {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+}
+
+.live-notif-messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 3px;
+}
+
+.live-notif-msg-item {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+}
+
+.live-notif-msg-bullet {
+  font-size: 9px;
+  color: #f97316;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.live-notif-msg-text {
+  font-size: 12.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.live-notif-msg-item.is-prev .live-notif-msg-text {
+  color: rgba(226, 232, 240, 0.6);
+  font-size: 11.5px;
+}
+
+.live-notif-msg-item.is-latest .live-notif-msg-text {
+  color: #ffffff;
+  font-weight: 500;
+  animation: liveMsgSlideIn 0.22s cubic-bezier(0.18, 0.89, 0.32, 1.15) both;
+}
+
+@keyframes liveMsgSlideIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 .live-notif-copy {
   flex: 1;
   min-width: 0;
@@ -8713,6 +8820,18 @@ button,
 [data-theme='light'] .live-notif-close {
   background: #f1f5f9;
   color: #475569;
+}
+
+[data-theme='light'] .live-notif-badge-bubble {
+  border-color: #ffffff;
+}
+
+[data-theme='light'] .live-notif-msg-item.is-prev .live-notif-msg-text {
+  color: #64748b;
+}
+
+[data-theme='light'] .live-notif-msg-item.is-latest .live-notif-msg-text {
+  color: #0f172a;
 }
 
 /* Profile Feed Posts / Brand Deals Tabs & Requests Sheet */

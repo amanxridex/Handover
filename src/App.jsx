@@ -366,16 +366,61 @@ export default function App() {
       playNotificationSound({
         type: alert.kind === 'message' ? 'message' : 'notification',
       });
-      setLiveAlert(alert);
+
+      let updatedCount = 1;
+      let combinedBody = alert.body || '';
+
+      setLiveAlert((prev) => {
+        // Group messages from the same sender or thread under the SAME notification
+        const isSameSender =
+          prev &&
+          ((alert.peer?.id && prev.peer?.id === alert.peer?.id) ||
+            (alert.senderId && prev.senderId === alert.senderId) ||
+            (alert.tag && prev.tag === alert.tag));
+
+        if (isSameSender) {
+          const prevList = Array.isArray(prev.messages)
+            ? prev.messages
+            : [prev.body].filter(Boolean);
+          const isDuplicate = prevList[prevList.length - 1] === alert.body;
+          const updatedMessages = isDuplicate
+            ? prevList
+            : [...prevList, alert.body];
+          updatedCount = updatedMessages.length;
+          combinedBody = updatedMessages.slice(-3).map((m) => `• ${m}`).join('\n');
+
+          return {
+            ...prev,
+            ...alert,
+            count: updatedCount,
+            messages: updatedMessages,
+            body: alert.body,
+            bumpKey: Date.now(),
+          };
+        }
+
+        return {
+          ...alert,
+          count: 1,
+          messages: [alert.body].filter(Boolean),
+          bumpKey: Date.now(),
+        };
+      });
+
+      // Keep open and reset dismiss timer so user can read grouped messages
       if (liveAlertTimerRef.current) clearTimeout(liveAlertTimerRef.current);
       liveAlertTimerRef.current = setTimeout(() => {
         setLiveAlert(null);
-      }, 4800);
+      }, 5500);
 
       if (getNotificationPermission() === 'granted') {
+        const notifTitle =
+          updatedCount > 1
+            ? `${alert.title} (${updatedCount} messages)`
+            : alert.title;
         sendOsNotification({
-          title: alert.title,
-          body: alert.body,
+          title: notifTitle,
+          body: combinedBody || alert.body,
           icon: alert.avatar || '/icon-192.png',
           tag: alert.tag,
           url: alert.url,

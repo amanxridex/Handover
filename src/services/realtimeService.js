@@ -86,65 +86,90 @@ export function subscribeRealtimeChannel(channelName, event, onMessage) {
   }
 }
 
+// Persistent transmitter channel pool for instant zero-latency broadcasts
+const txChannelPool = new Map();
+
 export async function broadcastRealtimeEvent(channelName, event, payload = {}) {
   if (!channelName || !event || !isSupabaseConfigured || !supabase) return;
 
-  try {
-    // Fast HTTP 202 broadcast directly into Realtime cluster (no WS join latency)
-    const activeEntry = channelRegistry.get(channelName);
-    const targetChannel = activeEntry?.channel || supabase.channel(channelName);
-    if (typeof targetChannel.httpSend === 'function') {
-      const res = await targetChannel.httpSend(event, payload);
-      if (res?.success !== false) {
-        return;
-      }
+  // 1. If this client already has an active listener channel for this topic, reuse it directly
+  const listenerEntry = channelRegistry.get(channelName);
+  if (listenerEntry?.channel) {
+    try {
+      listenerEntry.channel.send({
+        type: 'broadcast',
+        event,
+        payload,
+      });
+      return;
+    } catch {
+      // Fall through to transmitter pool
     }
-  } catch {
-    // Fall through to ephemeral WebSocket broadcast
   }
 
-  try {
-    const channel = supabase.channel(`tx:${channelName}:${Date.now()}`);
-    // Note: tx uses target channelName so listeners on channelName receive it
-    try {
-      supabase.removeChannel(channel);
-    } catch {
-      // Ignore
-    }
+  // 2. Persistent transmitter channel pool
+  let txEntry = txChannelPool.get(channelName);
+  if (!txEntry) {
+    const queue = [];
+    const tx = supabase.channel(`tx-${channelName}`, {
+      config: { broadcast: { ack: false, self: false } },
+    });
 
-    const tx = supabase.channel(channelName);
-    let done = false;
-    const cleanup = () => {
-      if (done) return;
-      done = true;
-      if (!channelRegistry.has(channelName)) {
-        try {
-          supabase.removeChannel(tx);
-        } catch {
-          // Ignore
-        }
-      }
+    txEntry = {
+      channel: tx,
+      isSubscribed: false,
+      queue,
+      idleTimer: null,
     };
-    const timer = setTimeout(cleanup, 3000);
+    txChannelPool.set(channelName, txEntry);
 
     tx.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
-        Promise.resolve(
-          tx.send({
-            type: 'broadcast',
-            event,
-            payload,
-          })
-        ).finally(() => {
-          clearTimeout(timer);
-          setTimeout(cleanup, 200);
-        });
+        txEntry.isSubscribed = true;
+        // Flush all queued messages immediately in arrival order
+        while (queue.length > 0) {
+          const item = queue.shift();
+          try {
+            tx.send({
+              type: 'broadcast',
+              event: item.event,
+              payload: item.payload,
+            });
+          } catch {
+            // Isolate individual send errors
+          }
+        }
       } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        clearTimeout(timer);
-        cleanup();
+        txEntry.isSubscribed = false;
       }
     });
-  } catch {
-    // Polling & Web Push still deliver reliably
   }
+
+  // Refresh idle keep-alive timer (keep alive for 5 minutes of reuse)
+  if (txEntry.idleTimer) clearTimeout(txEntry.idleTimer);
+  txEntry.idleTimer = setTimeout(() => {
+    txChannelPool.delete(channelName);
+    try {
+      supabase.removeChannel(txEntry.channel);
+    } catch {
+      // Ignore
+    }
+  }, 5 * 60 * 1000);
+
+  // If already subscribed, send immediately with 0ms delay!
+  if (txEntry.isSubscribed) {
+    try {
+      txEntry.channel.send({
+        type: 'broadcast',
+        event,
+        payload,
+      });
+      return;
+    } catch {
+      // Fallback: enqueue
+    }
+  }
+
+  // If currently joining/subscribing, enqueue to flush upon SUBSCRIBED
+  txEntry.queue.push({ event, payload });
 }
